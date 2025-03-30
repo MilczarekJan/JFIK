@@ -1,0 +1,12 @@
+2 + 4 * 3;
+2 + -4 * 3;
+NOT true AND NOT false OR x;
+2+2==4 OR 3^3==27 AND NOT 4^2*5 != 80;
+-2^3;
+integer x <- 5;
+read(value)  + 3 == 15;
+read();
+read(1);
+read(1,2);
+x <- 3;
+text s <- "Powiedziałem \"naura\"";
