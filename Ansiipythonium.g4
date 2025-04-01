@@ -5,24 +5,26 @@ orexpr: xorexpr (OR xorexpr)*;
 xorexpr: andexpr (XOR andexpr)?;
 andexpr: notexpr (AND notexpr)*;
 notexpr: NOT? compexpr;
-compexpr: multexpr (('<' | '>' | '<=' | '>=' | '!=' | '==') multexpr)*;
+compexpr: multexpr (('<' | '>' | '=<' | '>=' | '!=' | '==') multexpr)*;
 multexpr: addexpr (('*'|'/') addexpr)*;
 addexpr: minusexpr (('+'|'-') minusexpr)*;
 minusexpr: ('+'|'-')* powexpr;
 powexpr:   primaryexpr ('^' primaryexpr)?;
 primaryexpr:  funcallexpr | '(' expr ')' | literal;
-funcallexpr: ID '(' expr? (',' expr)* ')';
+funcallexpr: '(' ID (',' expr)* ')';
 literal: INT | DOUBLE | TRUE | FALSE | ID | STRING;
 statement:  expr ';'
     |       var_decl ';'
     |       var_ass ';'
     |       if_statement
     |       for_statement
+    |       print ';'
+    |       read ';'
     ;
 
 var_decl: type ID ASSIGNMENT expr;
 var_ass:  ID ASSIGNMENT expr;
-if_statement: 'if' '(' expr ')' stat_block ('else' stat_block)?;
+if_statement: 'if' '(' expr ')' stat_block (':' stat_block)?;
 for_statement: 'for' '(' (var_decl | var_ass) ';' expr ';' expr ')' stat_block;
 stat_block: '{' statement* '}';
 fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' stat_block;
@@ -30,6 +32,9 @@ arg_decl: type ID;
 class_decl: 'class' ID '{' field* fun_decl* '}'; //Muszą być najpierw pola
 struct_decl: 'struct' ID '{' field* '}';
 field: type ID ';';
+
+print: '<=' ID;
+read:  '=>' ID;
 
 type: type_identifier matrix_identifier?;
 type_identifier: INTEGER
@@ -53,8 +58,8 @@ NEWLINE : [\r\n]+ -> skip;
 WS      : [\p{White_Space}]+ -> channel(HIDDEN);
 INT     : [0-9]+ ;
 DOUBLE  : [0-9]+ '.' [0-9]+;
-TRUE    : 'true';
-FALSE   : 'false';
+TRUE    : 'positive';
+FALSE   : 'negative';
 AND     : 'AND';
 OR      : 'OR';
 NOT     : 'NOT';
