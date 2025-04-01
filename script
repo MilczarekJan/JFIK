@@ -1,0 +1,8 @@
+#!/bin/bash
+
+ANTLR=./antlr-4.13.2-complete.jar
+
+if [ "$1" == "gen" ]; then
+    java -jar $ANTLR -Dlanguage=Python3 -o output Ansiipythonium.g4
+fi
+
