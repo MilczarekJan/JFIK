@@ -30,10 +30,10 @@ stat_block: '{' statement* '}';
 fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' stat_block;
 arg_decl: type ID;
 class_decl: 'class' ID '{' field* fun_decl* '}'; //Muszą być najpierw pola
-struct_decl: 'struct' ID '{' field* '}';
+struct_decl: 'structure' ID '{' field* '}';
 field: type ID ';';
 
-print: '<=' ID;
+print: '<=' expr;
 read:  '=>' ID;
 
 type: type_identifier matrix_identifier?;
