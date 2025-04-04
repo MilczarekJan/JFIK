@@ -233,6 +233,24 @@ class AnsiipythoniumListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AnsiipythoniumParser#print.
+    def enterPrint(self, ctx:AnsiipythoniumParser.PrintContext):
+        pass
+
+    # Exit a parse tree produced by AnsiipythoniumParser#print.
+    def exitPrint(self, ctx:AnsiipythoniumParser.PrintContext):
+        pass
+
+
+    # Enter a parse tree produced by AnsiipythoniumParser#read.
+    def enterRead(self, ctx:AnsiipythoniumParser.ReadContext):
+        pass
+
+    # Exit a parse tree produced by AnsiipythoniumParser#read.
+    def exitRead(self, ctx:AnsiipythoniumParser.ReadContext):
+        pass
+
+
     # Enter a parse tree produced by AnsiipythoniumParser#type.
     def enterType(self, ctx:AnsiipythoniumParser.TypeContext):
         pass
