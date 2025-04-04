@@ -2,7 +2,7 @@ from output.AnsiipythoniumListener import AnsiipythoniumListener
 from output.AnsiipythoniumParser import AnsiipythoniumParser
 import ap_ast
 
-class ASTLitener(AnsiipythoniumListener):
+class ASTListener(AnsiipythoniumListener):
 
     def __init__(self):
         self.stack = []
