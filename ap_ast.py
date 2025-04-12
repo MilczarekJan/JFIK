@@ -5,7 +5,7 @@ class IntNum(Node):
     def __init__(self, value):
         self.value: int = value
 
-class Delcaration(Node):
+class Declaration(Node):
     def __init__(self, type_, name, value):
         self.type_ = type_
         self.name = name
@@ -19,3 +19,18 @@ class Assignment(Node):
 class Print(Node):
     def __init__(self, value):
         self.value = value
+
+class Literal(Node):
+    def __init__(self, value):
+        self.value = value
+
+class Variable(Node):
+    def __init__(self, name):
+        self.name = name
+
+class BinOp(Node):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+

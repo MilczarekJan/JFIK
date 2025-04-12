@@ -4,5 +4,8 @@ ANTLR=./antlr-4.13.2-complete.jar
 
 if [ "$1" == "gen" ]; then
     java -jar $ANTLR -Dlanguage=Python3 -o output Ansiipythonium.g4
+elif [ "$1" == "run" ]; then
+    python3 main.py > llc > clang -o prog
+    ./prog
 fi
 
