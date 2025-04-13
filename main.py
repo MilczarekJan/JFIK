@@ -12,6 +12,7 @@ if __name__ == "__main__":
     tokens = CommonTokenStream(lexer)
     parser = AnsiipythoniumParser(tokens)
     tree = parser.prog()
+    print(tree)
 
     listener = ASTListener()
     walker = ParseTreeWalker()

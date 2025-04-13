@@ -43,3 +43,56 @@ class ASTListener(AnsiipythoniumListener):
         if ctx.getChildCount() == 1:
             pass
 
+    def exitAddexpr(self, ctx):
+        self._build_binary_expr(ctx, "minusexpr")
+
+    def exitMultexpr(self, ctx):
+        self._build_binary_expr(ctx, "addexpr")
+
+    def exitCompexpr(self, ctx):
+        if len(ctx.multexpr()) == 1:
+            return
+        right = self.stack.pop()
+        left = self.stack.pop()
+        op = ctx.getChild(1).getText()
+        self.stack.append(ast.BinaryOp(left, op, right))
+
+    def exitAndexpr(self, ctx):
+        if len(ctx.notexpr()) == 1:
+            return
+        right = self.stack.pop()
+        left = self.stack.pop()
+        self.stack.append(ast.BinaryOp(left, "AND", right))
+
+    def exitXorexpr(self, ctx):
+        if ctx.XOR():
+            right = self.stack.pop()
+            left = self.stack.pop()
+            self.stack.append(ast.BinaryOp(left, "XOR", right))
+
+    def exitOrexpr(self, ctx):
+        if len(ctx.xorexpr()) == 1:
+            return
+        rights = [self.stack.pop() for _ in range(len(ctx.xorexpr()) - 1)]
+        left = self.stack.pop()
+        # flatten ORs into a left-associative tree
+        expr = left
+        for right in reversed(rights):
+            expr = ast.BinaryOp(expr, "OR", right)
+        self.stack.append(expr)
+
+    def exitNotexpr(self, ctx):
+        if ctx.NOT():
+            operand = self.stack.pop()
+            self.stack.append(ast.UnaryOp("NOT", operand))
+
+    def _build_binary_expr(self, ctx, rule_name, node_cls=ast.BinaryOp):
+        children = getattr(ctx, rule_name)()
+        if len(children) == 1:
+            return  # single child, already on stack
+
+        right = self.stack.pop()
+        left = self.stack.pop()
+        op = ctx.getChild(1).getText()
+        self.stack.append(node_cls(left, op, right))
+

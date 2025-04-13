@@ -25,8 +25,10 @@ class CodeGenerator:
         self.builder = ir.IRBuilder(block)
         # self.declare_printf()
 
-        print(tree, tree.statement)
+        print(tree)
+        print(tree.statement)
         for stmt in tree.statement():
+            print(stmt)
             self.gen_stmt(stmt)
 
         self.builder.ret(ir.Constant(ir.IntType(32), 0))
@@ -70,15 +72,24 @@ class CodeGenerator:
 
         if isinstance(expr, ast.Literal):
             return ir.Constant(ir.IntType(32), expr.value)
+
         elif isinstance(expr, ast.Variable):
             ptr = self.variables.get(expr.name)
             if ptr is None:
                 raise RuntimeError(f"Undefined variable: {expr.name}")
             return self.builder.load(ptr)
-        elif isinstance(expr, ast.BinOp):
+
+        elif isinstance(expr, ast.UnaryOp):
+            val = self.gen_expr(expr.operand)
+            if expr.op == 'NOT':
+                return self.builder.icmp_unsigned('==', val, ir.Constant(ir.IntType(32), 0))
+            raise NotImplementedError(f"Unary operator {expr.op}")
+
+        elif isinstance(expr, ast.BinaryOp):
             left = self.gen_expr(expr.left)
             right = self.gen_expr(expr.right)
             op = expr.op
+
             if op == '+':
                 return self.builder.add(left, right)
             elif op == '-':
@@ -87,4 +98,26 @@ class CodeGenerator:
                 return self.builder.mul(left, right)
             elif op == '/':
                 return self.builder.sdiv(left, right)
+
+            elif op == '<':
+                return self.builder.icmp_signed('<', left, right)
+            elif op == '>':
+                return self.builder.icmp_signed('>', left, right)
+            elif op == '<=':
+                return self.builder.icmp_signed('<=', left, right)
+            elif op == '>=':
+                return self.builder.icmp_signed('>=', left, right)
+            elif op == '==':
+                return self.builder.icmp_signed('==', left, right)
+            elif op == '!=':
+                return self.builder.icmp_signed('!=', left, right)
+
+            elif op == 'AND':
+                return self.builder.and_(left, right)
+            elif op == 'OR':
+                return self.builder.or_(left, right)
+            elif op == 'XOR':
+                return self.builder.xor(left, right)
+
+            raise NotImplementedError(f"Operator '{op}' not handled.")
 
