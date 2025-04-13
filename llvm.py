@@ -23,8 +23,9 @@ class CodeGenerator:
         self.func = ir.Function(self.module, main_ty, name="main")
         block = self.func.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block)
-        self.declare_printf()
+        # self.declare_printf()
 
+        print(tree, tree.statement)
         for stmt in tree.statement():
             self.gen_stmt(stmt)
 
