@@ -43,13 +43,13 @@ class ASTListener(AnsiipythoniumListener):
         if ctx.getChildCount() == 1:
             pass
 
-    def exitAddexpr(self, ctx):
+    def exitAddexpr(self, ctx: AnsiipythoniumParser.AddexprContext):
         self._build_binary_expr(ctx, "minusexpr")
 
-    def exitMultexpr(self, ctx):
+    def exitMultexpr(self, ctx: AnsiipythoniumParser.MultexprContext):
         self._build_binary_expr(ctx, "addexpr")
 
-    def exitCompexpr(self, ctx):
+    def exitCompexpr(self, ctx: AnsiipythoniumParser.CompexprContext):
         if len(ctx.multexpr()) == 1:
             return
         right = self.stack.pop()
@@ -57,20 +57,20 @@ class ASTListener(AnsiipythoniumListener):
         op = ctx.getChild(1).getText()
         self.stack.append(ast.BinaryOp(left, op, right))
 
-    def exitAndexpr(self, ctx):
+    def exitAndexpr(self, ctx: AnsiipythoniumParser.AndexprContext):
         if len(ctx.notexpr()) == 1:
             return
         right = self.stack.pop()
         left = self.stack.pop()
         self.stack.append(ast.BinaryOp(left, "AND", right))
 
-    def exitXorexpr(self, ctx):
+    def exitXorexpr(self, ctx: AnsiipythoniumParser.XorexprContext):
         if ctx.XOR():
             right = self.stack.pop()
             left = self.stack.pop()
             self.stack.append(ast.BinaryOp(left, "XOR", right))
 
-    def exitOrexpr(self, ctx):
+    def exitOrexpr(self, ctx: AnsiipythoniumParser.OrexprContext):
         if len(ctx.xorexpr()) == 1:
             return
         rights = [self.stack.pop() for _ in range(len(ctx.xorexpr()) - 1)]
@@ -81,7 +81,7 @@ class ASTListener(AnsiipythoniumListener):
             expr = ast.BinaryOp(expr, "OR", right)
         self.stack.append(expr)
 
-    def exitNotexpr(self, ctx):
+    def exitNotexpr(self, ctx: AnsiipythoniumParser.NotexprContext):
         if ctx.NOT():
             operand = self.stack.pop()
             self.stack.append(ast.UnaryOp("NOT", operand))
@@ -95,4 +95,26 @@ class ASTListener(AnsiipythoniumListener):
         left = self.stack.pop()
         op = ctx.getChild(1).getText()
         self.stack.append(node_cls(left, op, right))
+
+    def exitLiteral(self, ctx: AnsiipythoniumParser.LiteralContext):
+        if ctx.INT():
+            self.stack.append(ast.Literal(int(ctx.INT().getText()), "int"))
+
+        elif ctx.DOUBLE():
+            self.stack.append(ast.Literal(float(ctx.DOUBLE().getText()), "float"))
+
+        elif ctx.TRUE():
+            self.stack.append(ast.Literal(True, "bool"))
+
+        elif ctx.FALSE():
+            self.stack.append(ast.Literal(False, "bool"))
+
+        elif ctx.STRING():
+            raw = ctx.STRING().getText()         # Includes the quotes
+            unquoted = raw[1:-1].replace('\\"', '"')  # Handle escape
+            self.stack.append(ast.Literal(unquoted, "string"))
+
+        elif ctx.ID():
+            # Assume it's a variable (not a keyword literal)
+            self.stack.append(ast.Variable(ctx.ID().getText()))
 

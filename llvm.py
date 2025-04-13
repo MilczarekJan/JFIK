@@ -121,3 +121,22 @@ class CodeGenerator:
 
             raise NotImplementedError(f"Operator '{op}' not handled.")
 
+        elif isinstance(expr, ast.Literal):
+            if expr.type_ == "int":
+                return ir.Constant(ir.IntType(32), expr.value)
+
+            elif expr.type_ == "float":
+                return ir.Constant(ir.DoubleType(), expr.value)
+
+            elif expr.type_ == "bool":
+                return ir.Constant(ir.IntType(1), int(expr.value))
+
+            elif expr.type_ == "string":
+                # Create a global constant string
+                strval = expr.value + "\0"
+                str_type = ir.ArrayType(ir.IntType(8), len(strval))
+                var = ir.GlobalVariable(self.module, str_type, name="str")
+                var.global_constant = True
+                # var.initializer = ir.Constant(str_type, bytearray(strval.encode("utf-8")))
+                return self.builder.gep(var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+
