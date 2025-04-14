@@ -47,10 +47,7 @@ class CodeGenerator:
         self.builder = ir.IRBuilder(block)
         self.declare_printf()
 
-        # print("llvm - tree", vars(tree))
-        # print("llvm - tree.statement", vars(tree.statements))
         for stmt in tree.statements:
-            # print("llvm - stmt", stmt)
             self.gen_stmt(stmt)
 
         self.builder.ret(ir.Constant(ir.IntType(32), 0))
