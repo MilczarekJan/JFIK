@@ -1,6 +1,10 @@
 class Node:
     pass
 
+class Program(Node):
+    def __init__(self, statements):
+        self.statements = statements
+
 class IntNum(Node):
     def __init__(self, value):
         self.value: int = value
@@ -42,5 +46,5 @@ class UnaryOp(Node):
 class Literal(Node):
     def __init__(self, value, type_):
         self.value = value
-        self.type_ = type_  # "int", "float", "bool", "string"
+        self.type_ = type_
 

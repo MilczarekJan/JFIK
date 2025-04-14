@@ -1,5 +1,13 @@
-from llvmlite import ir
+from type import Type
+from llvmlite import ir, binding
 import ap_ast as ast
+
+LLVM = {
+    Type.INT: ir.IntType(32),
+    Type.DOUBLE: ir.DoubleType(),
+    Type.BOOL: ir.IntType(1),
+    Type.STRING: ir.IntType(8).as_pointer()
+}
 
 class CodeGenerator:
     def __init__(self):
@@ -8,6 +16,20 @@ class CodeGenerator:
         self.printf = None
         self.func = None
         self.variables = {}
+        self.fmt_str = None
+
+
+        binding.initialize()
+        binding.initialize_native_target()
+        binding.initialize_native_asmprinter()
+
+        # Get the default target triple
+        self.module.triple = binding.get_default_triple()
+
+        # Set a default data layout
+        target = binding.Target.from_default_triple()
+        target_machine = target.create_target_machine()
+        self.module.data_layout = target_machine.target_data
 
     def compile(self):
         # self.gen_main()
@@ -23,12 +45,12 @@ class CodeGenerator:
         self.func = ir.Function(self.module, main_ty, name="main")
         block = self.func.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block)
-        # self.declare_printf()
+        self.declare_printf()
 
-        print(tree)
-        print(tree.statement)
-        for stmt in tree.statement():
-            print(stmt)
+        # print("llvm - tree", vars(tree))
+        # print("llvm - tree.statement", vars(tree.statements))
+        for stmt in tree.statements:
+            # print("llvm - stmt", stmt)
             self.gen_stmt(stmt)
 
         self.builder.ret(ir.Constant(ir.IntType(32), 0))
@@ -56,14 +78,21 @@ class CodeGenerator:
             self.builder.call(self.printf, [ptr, val])
 
     def printf_format(self):
+        if self.fmt_str:
+            return self.fmt_str
+
         fmt_str = "%d\n\0"
         fmt_bytes = bytearray(fmt_str.encode("utf8"))
         str_type = ir.ArrayType(ir.IntType(8), len(fmt_bytes))
 
+        if "fmt" in self.module.globals:
+            return self.module.globals["fmt"]
+
         global_fmt = ir.GlobalVariable(self.module, str_type, name="fmt")
+
         global_fmt.linkage = "internal"
         global_fmt.global_constant = True
-        # global_fmt.initializer = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_str)), bytearray(fmt_str.encode("utf8")))
+        global_fmt.initializer = ir.Constant(str_type, fmt_bytes)
 
         return global_fmt
 
@@ -122,16 +151,18 @@ class CodeGenerator:
             raise NotImplementedError(f"Operator '{op}' not handled.")
 
         elif isinstance(expr, ast.Literal):
-            if expr.type_ == "int":
-                return ir.Constant(ir.IntType(32), expr.value)
+            type_ = expr.type_
 
-            elif expr.type_ == "float":
-                return ir.Constant(ir.DoubleType(), expr.value)
+            if type_ == Type.INT:
+                return ir.Constant(LLVM[type_], expr.value)
 
-            elif expr.type_ == "bool":
-                return ir.Constant(ir.IntType(1), int(expr.value))
+            elif type_ == Type.DOUBLE:
+                return ir.Constant(LLVM[type_], expr.value)
 
-            elif expr.type_ == "string":
+            elif type_ == Type.BOOL:
+                return ir.Constant(LLVM[type_], int(expr.value))
+
+            elif type_ == Type.STRING:
                 # Create a global constant string
                 strval = expr.value + "\0"
                 str_type = ir.ArrayType(ir.IntType(8), len(strval))

@@ -1,5 +1,6 @@
 from output.AnsiipythoniumListener import AnsiipythoniumListener
 from output.AnsiipythoniumParser import AnsiipythoniumParser
+from type import Type
 import ap_ast as ast
 
 class ASTListener(AnsiipythoniumListener):
@@ -9,21 +10,21 @@ class ASTListener(AnsiipythoniumListener):
         self.ast = []
 
     def exitProg(self, ctx: AnsiipythoniumParser.ProgContext):
-        self.ast = self.stack.copy()
+        self.ast = ast.Program(self.stack.copy())
 
     def exitVar_ass(self, ctx: AnsiipythoniumParser.Var_assContext):
         name = ctx.ID().getText()
-        value = int(ctx.expr().getText())
+        value = self.stack.pop()
         self.stack.append(ast.Assignment(name, value))
 
     def exitVar_decl(self, ctx: AnsiipythoniumParser.Var_declContext):
         type_ = ctx.type_().getText()
         name = ctx.ID().getText()
-        value = int(ctx.expr().getText())
+        value = self.stack.pop()
         self.stack.append(ast.Declaration(type_, name, value))
 
     def exitPrint(self, ctx: AnsiipythoniumParser.PrintContext):
-        value = ctx.expr().getText()
+        value = self.stack.pop()
         self.stack.append(ast.Print(value))
 
     def exitPrimaryexpr(self, ctx: AnsiipythoniumParser.PrimaryexprContext):
@@ -98,23 +99,25 @@ class ASTListener(AnsiipythoniumListener):
 
     def exitLiteral(self, ctx: AnsiipythoniumParser.LiteralContext):
         if ctx.INT():
-            self.stack.append(ast.Literal(int(ctx.INT().getText()), "int"))
+            val = int(ctx.INT().getText())
+            self.stack.append(ast.Literal(val, Type.INT))
 
         elif ctx.DOUBLE():
-            self.stack.append(ast.Literal(float(ctx.DOUBLE().getText()), "float"))
+            val = float(ctx.DOUBLE().getText())
+            self.stack.append(ast.Literal(val, Type.DOUBLE))
 
         elif ctx.TRUE():
-            self.stack.append(ast.Literal(True, "bool"))
+            self.stack.append(ast.Literal(True, Type.BOOL))
 
         elif ctx.FALSE():
-            self.stack.append(ast.Literal(False, "bool"))
+            self.stack.append(ast.Literal(False, Type.BOOL))
 
         elif ctx.STRING():
-            raw = ctx.STRING().getText()         # Includes the quotes
-            unquoted = raw[1:-1].replace('\\"', '"')  # Handle escape
-            self.stack.append(ast.Literal(unquoted, "string"))
+            raw = ctx.STRING().getText()
+            val = raw[1:-1].replace('\\"', '"')  # remove quotes
+            self.stack.append(ast.Literal(val, Type.STRING))
 
         elif ctx.ID():
-            # Assume it's a variable (not a keyword literal)
+            # It's not a literal, it's a variable
             self.stack.append(ast.Variable(ctx.ID().getText()))
 
