@@ -4,7 +4,9 @@ from output.AnsiipythoniumParser import AnsiipythoniumParser
 from listener import ASTListener
 from llvm import CodeGenerator
 
-filename = './tests/01_assign_print_declare'
+import sys
+
+filename = sys.argv[1]
 
 if __name__ == "__main__":
     stream = FileStream(filename)

@@ -1,0 +1,7 @@
+integer x <- 5;
+integer y <- 10;
+
+<= x + y;
+<= y - x;
+<= x * y;
+<= y / x;
