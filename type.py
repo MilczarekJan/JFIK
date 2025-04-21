@@ -1,5 +1,6 @@
 class Type:
     INT = "int"
-    DOUBLE = "double"
+    FLOAT32 = "float"
+    FLOAT64 = "double"
     BOOL = "bool"
     STRING = "string"

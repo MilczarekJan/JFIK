@@ -4,7 +4,8 @@ import ap_ast as ast
 
 LLVM = {
     Type.INT: ir.IntType(32),
-    Type.DOUBLE: ir.DoubleType(),
+    Type.FLOAT32: ir.FloatType(),
+    Type.FLOAT64: ir.DoubleType(),
     Type.BOOL: ir.IntType(1),
     Type.STRING: ir.IntType(8).as_pointer()
 }
@@ -32,7 +33,6 @@ class CodeGenerator:
         self.module.data_layout = target_machine.target_data
 
     def compile(self):
-        # self.gen_main()
         print(self.module)
 
     def declare_printf(self):
@@ -129,7 +129,7 @@ class CodeGenerator:
                 return self.builder.icmp_signed('<', left, right)
             elif op == '>':
                 return self.builder.icmp_signed('>', left, right)
-            elif op == '<=':
+            elif op == '=<':
                 return self.builder.icmp_signed('<=', left, right)
             elif op == '>=':
                 return self.builder.icmp_signed('>=', left, right)
@@ -153,7 +153,10 @@ class CodeGenerator:
             if type_ == Type.INT:
                 return ir.Constant(LLVM[type_], expr.value)
 
-            elif type_ == Type.DOUBLE:
+            elif type_ == Type.FLOAT32:
+                return ir.Constant(LLVM[type_], expr.value)
+
+            elif type_ == Type.FLOAT64:
                 return ir.Constant(LLVM[type_], expr.value)
 
             elif type_ == Type.BOOL:

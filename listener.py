@@ -104,7 +104,7 @@ class ASTListener(AnsiipythoniumListener):
 
         elif ctx.DOUBLE():
             val = float(ctx.DOUBLE().getText())
-            self.stack.append(ast.Literal(val, Type.DOUBLE))
+            self.stack.append(ast.Literal(val, Type.FLOAT64))
 
         elif ctx.TRUE():
             self.stack.append(ast.Literal(True, Type.BOOL))
@@ -120,4 +120,10 @@ class ASTListener(AnsiipythoniumListener):
         elif ctx.ID():
             # It's not a literal, it's a variable
             self.stack.append(ast.Variable(ctx.ID().getText()))
+
+    def exitType(self, ctx: AnsiipythoniumParser.TypeContext):
+        self.stack.append(ctx.getText())
+
+    def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
+        self.stack.append(ctx.getText())
 
