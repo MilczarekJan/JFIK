@@ -5,10 +5,6 @@ class Program(Node):
     def __init__(self, statements):
         self.statements = statements
 
-class IntNum(Node):
-    def __init__(self, value):
-        self.value: int = value
-
 class Declaration(Node):
     def __init__(self, type_, name, value):
         self.type_ = type_
@@ -23,10 +19,6 @@ class Assignment(Node):
 class Print(Node):
     def __init__(self, value):
         self.value = value
-
-# class Literal(Node):
-#     def __init__(self, value):
-#         self.value = value
 
 class Variable(Node):
     def __init__(self, name):

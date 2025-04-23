@@ -1,6 +1,6 @@
 class Type:
-    INT = "int"
-    FLOAT32 = "float"
-    FLOAT64 = "double"
+    INT = "integer"
+    FLOAT32 = "single_precision"
+    FLOAT64 = "double_precision"
     BOOL = "bool"
-    STRING = "string"
+    STRING = "text"

@@ -21,6 +21,9 @@ class ASTListener(AnsiipythoniumListener):
         type_ = ctx.type_().getText()
         name = ctx.ID().getText()
         value = self.stack.pop()
+        if type_ == "single_precision":
+            # print("s_p")
+            value.type_ = Type.FLOAT32
         self.stack.append(ast.Declaration(type_, name, value))
 
     def exitPrint(self, ctx: AnsiipythoniumParser.PrintContext):
@@ -122,8 +125,10 @@ class ASTListener(AnsiipythoniumListener):
             self.stack.append(ast.Variable(ctx.ID().getText()))
 
     def exitType(self, ctx: AnsiipythoniumParser.TypeContext):
-        self.stack.append(ctx.getText())
+        # self.stack.append(ctx.getText())
+        pass
 
     def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
-        self.stack.append(ctx.getText())
+        # self.stack.append(ctx.getText())
+        pass
 
