@@ -40,12 +40,31 @@ class CodeGenerator:
         printf = ir.FunctionType(ir.IntType(32), [voidptr], var_arg=True)
         self.printf = ir.Function(self.module, printf, name="printf")
 
+    def declare_scanf(self):
+        voidptr = ir.IntType(8).as_pointer()
+        scanf_ty = ir.FunctionType(ir.IntType(32), [voidptr], var_arg=True)
+        self.scanf = ir.Function(self.module, scanf_ty, name="scanf")
+
+    def declare_fgets(self):
+        char_ptr = ir.IntType(8).as_pointer()
+        fgets_ty = ir.FunctionType(char_ptr, [char_ptr, ir.IntType(32), char_ptr])
+        self.fgets = ir.Function(self.module, fgets_ty, name="fgets")
+
+    def declare_stdin(self):
+        if "stdin" not in self.module.globals:
+            stdin = ir.GlobalVariable(self.module, ir.IntType(8).as_pointer(), name="stdin")
+            stdin.linkage = "external"
+            # stdin.initializer = ir.Constant(i8ptr, None)  # null pointer to satisfy llvmlite
+
     def generate(self, tree):
         main_ty = ir.FunctionType(ir.IntType(32), [])
         self.func = ir.Function(self.module, main_ty, name="main")
         block = self.func.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block)
         self.declare_printf()
+        self.declare_scanf()
+        self.declare_fgets()
+        self.declare_stdin()
 
         for stmt in tree.statements:
             self.gen_stmt(stmt)
@@ -81,7 +100,57 @@ class CodeGenerator:
             self.builder.store(val, ptr)
 
         elif isinstance(stmt, ast.Read):
-            ptr = self.variables[stmt.name]
+            ptr = self.variables.get(stmt.name)
+            if ptr is None:
+                raise RuntimeError(f"Variable '{stmt.name}' not declared")
+
+            var_type = ptr.type.pointee
+
+            if isinstance(var_type, ir.PointerType):  # STRING (char*)
+                buf_len = 256
+                buf_type = ir.ArrayType(ir.IntType(8), buf_len)
+                buf = self.builder.alloca(buf_type, name=f"{stmt.name}_buf")
+                buf_ptr = self.builder.gep(buf, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+
+                stdin_ptr = self.module.get_global("stdin")
+                stdin_val = self.builder.load(stdin_ptr)
+
+                self.builder.call(self.fgets, [
+                    buf_ptr,
+                    ir.Constant(ir.IntType(32), buf_len),
+                    stdin_val
+                ])
+                self.builder.store(buf_ptr, ptr)
+
+            # BOOL: map 0 to "negative", 1 to "positive"
+            elif isinstance(var_type, ir.IntType) and var_type.width == 1:
+                str_buf_type = ir.ArrayType(ir.IntType(8), 8)
+                str_buf = self.builder.alloca(str_buf_type, name=f"{stmt.name}_buf")
+                str_ptr = self.builder.gep(str_buf, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+
+                # Step 2: Read into buffer using %s
+                fmt_ptr = self._scanf_format(LLVM[Type.STRING])
+                fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
+                self.builder.call(self.scanf, [fmt_cast, str_ptr])
+
+                true_ptr = self._string_constant("positive", name="bool_true_cmp")
+                # false_ptr = self._string_constant("negative", name="bool_false_cmp")
+
+                strcmp_ty = ir.FunctionType(ir.IntType(32), [ir.IntType(8).as_pointer(), ir.IntType(8).as_pointer()])
+                strcmp = self.module.globals.get("strcmp")
+                if not strcmp:
+                    strcmp = ir.Function(self.module, strcmp_ty, name="strcmp")
+
+                result = self.builder.call(strcmp, [str_ptr, true_ptr])
+                is_true = self.builder.icmp_signed("==", result, ir.Constant(ir.IntType(32), 0))
+
+                bool_val = self.builder.zext(is_true, ir.IntType(1))
+                self.builder.store(bool_val, ptr)
+
+            else:
+                fmt_ptr = self._scanf_format(var_type)
+                fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
+                self.builder.call(self.scanf, [fmt_cast, ptr])
 
         elif isinstance(stmt, ast.Print):
             val = self.gen_expr(stmt.value)
@@ -102,7 +171,7 @@ class CodeGenerator:
             else:
                 # llvm can't print floats for some reason and need to be casted to double :(
                 if isinstance(val_type, ir.FloatType):
-                    val = self.builder.fpext(val, ir.DoubleType())
+                   val = self.builder.fpext(val, ir.DoubleType())
 
                 fmt_ptr = self._printf_format(val_type)
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
@@ -137,6 +206,34 @@ class CodeGenerator:
 
         return global_fmt
 
+    def _scanf_format(self, type_):
+        if isinstance(type_, ir.IntType):
+            fmt_str = "%d\0"
+            if type_.width == 1:
+                name = "scan_bool"
+            else:
+                name = "scan_int"
+        elif isinstance(type_, (ir.FloatType, ir.DoubleType)):
+            fmt_str = "%f\0"
+            name = "scan_float"
+        elif isinstance(type_, ir.PointerType) and isinstance(type_.pointee, ir.IntType) and type_.pointee.width == 8:
+            fmt_str = "%s\0"
+            name = "scan_str"
+        else:
+            raise NotImplementedError("Unsupported scanf type: " + str(type_))
+
+        if name in self.module.globals:
+            return self.module.globals[name]
+
+        fmt_bytes = bytearray(fmt_str.encode("utf8"))
+        str_type = ir.ArrayType(ir.IntType(8), len(fmt_bytes))
+        global_fmt = ir.GlobalVariable(self.module, str_type, name=name)
+        global_fmt.linkage = "internal"
+        global_fmt.global_constant = True
+        global_fmt.initializer = ir.Constant(str_type, fmt_bytes)
+
+        return global_fmt
+
     def _string_constant(self, s, name):
         s += "\0"
         str_type = ir.ArrayType(ir.IntType(8), len(s))
@@ -151,7 +248,6 @@ class CodeGenerator:
         ptr = self.builder.gep(var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
         return ptr
 
-
     def gen_expr(self, expr):
         assert isinstance(self.builder, ir.IRBuilder)
 
@@ -164,7 +260,8 @@ class CodeGenerator:
         elif isinstance(expr, ast.UnaryOp):
             val = self.gen_expr(expr.operand)
             if expr.op == 'NOT':
-                return self.builder.icmp_unsigned('==', val, ir.Constant(ir.IntType(32), 0))
+                if isinstance(val.type, ir.IntType) and val.type.width == 1:
+                    return self.builder.xor(val, ir.Constant(ir.IntType(1), 1))
             raise NotImplementedError(f"Unary operator {expr.op}")
 
         elif isinstance(expr, ast.BinaryOp):
@@ -184,10 +281,10 @@ class CodeGenerator:
                 elif isinstance(right.type, ir.FloatType) and isinstance(left.type, ir.DoubleType):
                     right = self.builder.fpext(right, ir.DoubleType())
                 # double -> float
-                elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
-                    left = self.builder.fptrunc(left, ir.FloatType())
-                elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
-                    right = self.builder.fptrunc(right, ir.FloatType())
+                #elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
+                #    left = self.builder.fptrunc(left, ir.FloatType())
+                #elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
+                #    right = self.builder.fptrunc(right, ir.FloatType())
 
             op = expr.op
 

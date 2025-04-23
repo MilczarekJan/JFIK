@@ -1,0 +1,3 @@
+boolean x <- positive;
+=> x;
+<= NOT x;

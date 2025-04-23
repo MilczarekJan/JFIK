@@ -1,16 +1,18 @@
 grammar Ansiipythonium;		
 prog:	(statement | fun_decl | class_decl | struct_decl)+ EOF ;
-expr: orexpr;
-orexpr: xorexpr (OR xorexpr)*;
-xorexpr: andexpr (XOR andexpr)?;
-andexpr: notexpr (AND notexpr)*;
-notexpr: NOT? compexpr;
-compexpr: multexpr (('<' | '>' | '=<' | '>=' | '!=' | '==') multexpr)*;
-multexpr: addexpr (('*'|'/') addexpr)*;
-addexpr: minusexpr (('+'|'-') minusexpr)*;
-minusexpr: ('+'|'-')* primaryexpr;
-primaryexpr:  funcallexpr | '(' expr ')' | literal;
-funcallexpr: '(' ID (',' expr)* ')';
+
+expr	    : orexpr;
+orexpr	    : xorexpr (OR xorexpr)*;
+xorexpr	    : andexpr (XOR andexpr)*;
+andexpr	    : notexpr (AND notexpr)*;
+notexpr	    : NOT? compexpr;
+compexpr    : addexpr (('<' | '>' | '=<' | '>=' | '!=' | '==') addexpr)*;
+addexpr	    : multexpr (('+'|'-') multexpr)*;
+multexpr    : minusexpr (('*'|'/') minusexpr)*;
+minusexpr   : ('+'|'-')* primaryexpr;
+primaryexpr :  funcallexpr | '(' expr ')' | literal;
+funcallexpr : ID '(' (',' expr)* ')';
+
 literal: INT | DOUBLE | TRUE | FALSE | ID | STRING;
 statement:  expr ';'
     |       var_decl ';'

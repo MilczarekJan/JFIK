@@ -51,13 +51,13 @@ class ASTListener(AnsiipythoniumListener):
             pass
 
     def exitAddexpr(self, ctx: AnsiipythoniumParser.AddexprContext):
-        self._build_binary_expr(ctx, "minusexpr")
+        self._build_binary_expr(ctx, "multexpr")
 
     def exitMultexpr(self, ctx: AnsiipythoniumParser.MultexprContext):
-        self._build_binary_expr(ctx, "addexpr")
+        self._build_binary_expr(ctx, "minusexpr")
 
     def exitCompexpr(self, ctx: AnsiipythoniumParser.CompexprContext):
-        if len(ctx.multexpr()) == 1:
+        if len(ctx.addexpr()) == 1:
             return
         right = self.stack.pop()
         left = self.stack.pop()
@@ -128,10 +128,8 @@ class ASTListener(AnsiipythoniumListener):
             self.stack.append(ast.Variable(ctx.ID().getText()))
 
     def exitType(self, ctx: AnsiipythoniumParser.TypeContext):
-        # self.stack.append(ctx.getText())
         pass
 
     def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
-        # self.stack.append(ctx.getText())
         pass
 
