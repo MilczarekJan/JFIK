@@ -346,7 +346,8 @@ class CodeGenerator:
                 # Create a global constant string
                 strval = expr.value + "\0"
                 str_type = ir.ArrayType(ir.IntType(8), len(strval))
-                var = ir.GlobalVariable(self.module, str_type, name="str")
+                name = f"str_{abs(hash(expr.value)) % 100_000}" # names must be unique
+                var = ir.GlobalVariable(self.module, str_type, name=name)
                 var.global_constant = True
                 var.initializer = ir.Constant(str_type, bytearray(strval.encode("utf-8")))
                 return self.builder.gep(var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
