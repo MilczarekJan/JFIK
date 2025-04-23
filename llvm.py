@@ -61,13 +61,14 @@ class CodeGenerator:
 
             if val.type != llvm_type:
                 if llvm_type == ir.FloatType():
-                    val = self.builder.sitofp(val, ir.FloatType())
+                    val = self.builder.fptrunc(val, ir.FloatType())
+                    # val = self.builder.sitofp(val, ir.FloatType())
                 elif llvm_type == ir.DoubleType():
                     val = self.builder.sitofp(val, ir.DoubleType())
                 elif llvm_type == ir.IntType(32):
                     val = self.builder.fptosi(val, ir.IntType(32))
 
-
+            # print(llvm_type, val)
             ptr = self.builder.alloca(llvm_type, name=stmt.name)
             self.builder.store(val, ptr)
             self.variables[stmt.name] = ptr
@@ -78,6 +79,9 @@ class CodeGenerator:
             if not ptr:
                 raise RuntimeError(f"Variable '{stmt.name}' not declared")
             self.builder.store(val, ptr)
+
+        elif isinstance(stmt, ast.Read):
+            ptr = self.variables[stmt.name]
 
         elif isinstance(stmt, ast.Print):
             val = self.gen_expr(stmt.value)
@@ -96,6 +100,8 @@ class CodeGenerator:
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, bool_str])
             else:
+                if isinstance(val_type, ir.FloatType):
+                    val = self.builder.fpext(val, ir.DoubleType())
                 fmt_ptr = self._printf_format(val_type)
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, val])
@@ -178,10 +184,10 @@ class CodeGenerator:
                 elif isinstance(right.type, ir.FloatType) and isinstance(left.type, ir.DoubleType):
                     right = self.builder.fpext(right, ir.DoubleType())
                 # double -> float
-                # elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
-                #     left = self.builder.fptrunc(left, ir.FloatType())
-                # elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
-                #     right = self.builder.fptrunc(right, ir.FloatType())
+                elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
+                    left = self.builder.fptrunc(left, ir.FloatType())
+                elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
+                    right = self.builder.fptrunc(right, ir.FloatType())
 
             op = expr.op
 

@@ -20,6 +20,10 @@ class Print(Node):
     def __init__(self, value):
         self.value = value
 
+class Read(Node):
+    def __init__(self, name):
+        self.name = name
+
 class Variable(Node):
     def __init__(self, name):
         self.name = name

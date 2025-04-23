@@ -30,6 +30,9 @@ class ASTListener(AnsiipythoniumListener):
         value = self.stack.pop()
         self.stack.append(ast.Print(value))
 
+    def exitRead(self, ctx: AnsiipythoniumParser.ReadContext):
+        self.stack.append(ast.Read(ctx.ID().getText()))
+
     def exitPrimaryexpr(self, ctx: AnsiipythoniumParser.PrimaryexprContext):
         if ctx.literal():
             pass
