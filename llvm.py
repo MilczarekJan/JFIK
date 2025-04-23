@@ -213,9 +213,12 @@ class CodeGenerator:
                 name = "scan_bool"
             else:
                 name = "scan_int"
-        elif isinstance(type_, (ir.FloatType, ir.DoubleType)):
-            fmt_str = "%f\0"
+        elif isinstance(type_, ir.DoubleType):
+            fmt_str = "%lf\0"
             name = "scan_float"
+        elif isinstance(type_, ir.FloatType):
+            fmt_str = "%f\0"
+            name = "scan_double"
         elif isinstance(type_, ir.PointerType) and isinstance(type_.pointee, ir.IntType) and type_.pointee.width == 8:
             fmt_str = "%s\0"
             name = "scan_str"
