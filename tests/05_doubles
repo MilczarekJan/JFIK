@@ -1,0 +1,7 @@
+single_precision x <- 5.0;
+<= x / 2.0;
+<= x / 2;
+
+double_precision y <- 10.0;
+<= y / 3.0;
+<= y / 3;
