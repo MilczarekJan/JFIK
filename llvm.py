@@ -61,8 +61,8 @@ class CodeGenerator:
 
             if val.type != llvm_type:
                 if llvm_type == ir.FloatType():
-                    val = self.builder.fptrunc(val, ir.FloatType())
-                    # val = self.builder.sitofp(val, ir.FloatType())
+                    # val = self.builder.fptrunc(val, ir.FloatType())
+                    val = self.builder.sitofp(val, ir.FloatType())
                 elif llvm_type == ir.DoubleType():
                     val = self.builder.sitofp(val, ir.DoubleType())
                 elif llvm_type == ir.IntType(32):
@@ -87,7 +87,7 @@ class CodeGenerator:
             val = self.gen_expr(stmt.value)
             val_type = val.type
 
-            # BOOL: map 0 to "false", 1 to "true"
+            # BOOL: map 0 to "negative", 1 to "positive"
             if isinstance(val_type, ir.IntType) and val_type.width == 1:
                 true_str = self._string_constant("positive", "bool_true")
                 true_cast = self.builder.bitcast(true_str, ir.IntType(8).as_pointer())
@@ -100,8 +100,10 @@ class CodeGenerator:
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, bool_str])
             else:
+                # llvm can't print floats for some reason and need to be casted to double :(
                 if isinstance(val_type, ir.FloatType):
                     val = self.builder.fpext(val, ir.DoubleType())
+
                 fmt_ptr = self._printf_format(val_type)
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, val])
@@ -175,9 +177,7 @@ class CodeGenerator:
                 if isinstance(left.type, ir.IntType) and isinstance(right.type, (ir.FloatType, ir.DoubleType)):
                     left = self.builder.sitofp(left, right.type)
                 elif isinstance(right.type, ir.IntType) and isinstance(left.type, (ir.FloatType, ir.DoubleType)):
-                    # print(f"changed {right.type} {right} to {left.type}")
                     right = self.builder.sitofp(right, left.type)
-                    # print(f"proof: {right} {right.type}")
                 # float -> double
                 elif isinstance(left.type, ir.FloatType) and isinstance(right.type, ir.DoubleType):
                     left = self.builder.fpext(left, ir.DoubleType())
