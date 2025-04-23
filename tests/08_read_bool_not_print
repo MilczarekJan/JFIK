@@ -1,3 +1,4 @@
+<= "read bool, print NOT";
 boolean x <- positive;
 => x;
 <= NOT x;

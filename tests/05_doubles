@@ -1,7 +1,9 @@
+<= "float 5.0 div by 2.0 and 2";
 single_precision x <- 5.0;
 <= x / 2.0;
 <= x / 2;
 
+<= "double 10.0 div by 3.0 and 3";
 double_precision y <- 10.0;
 <= y / 3.0;
 <= y / 3;

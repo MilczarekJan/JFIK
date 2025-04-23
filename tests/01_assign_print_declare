@@ -1,3 +1,5 @@
+<= "declares int 10, prints, assigns 12 and prints again";
+
 integer x <- 10;
 <= x;
 x <- 12;
