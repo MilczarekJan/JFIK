@@ -1,14 +1,16 @@
-from type import Type
-from llvmlite import ir, binding
+from llvmlite import binding, ir
+
 import ap_ast as ast
+from type import Type
 
 LLVM = {
     Type.INT: ir.IntType(32),
     Type.FLOAT32: ir.FloatType(),
     Type.FLOAT64: ir.DoubleType(),
     Type.BOOL: ir.IntType(1),
-    Type.STRING: ir.IntType(8).as_pointer()
+    Type.STRING: ir.IntType(8).as_pointer(),
 }
+
 
 class CodeGenerator:
     def __init__(self):
@@ -18,7 +20,6 @@ class CodeGenerator:
         self.func = None
         self.variables = {}
         self.fmt_str = None
-
 
         binding.initialize()
         binding.initialize_native_target()
@@ -52,7 +53,9 @@ class CodeGenerator:
 
     def declare_stdin(self):
         if "stdin" not in self.module.globals:
-            stdin = ir.GlobalVariable(self.module, ir.IntType(8).as_pointer(), name="stdin")
+            stdin = ir.GlobalVariable(
+                self.module, ir.IntType(8).as_pointer(), name="stdin"
+            )
             stdin.linkage = "external"
             # stdin.initializer = ir.Constant(i8ptr, None)  # null pointer to satisfy llvmlite
 
@@ -110,23 +113,28 @@ class CodeGenerator:
                 buf_len = 256
                 buf_type = ir.ArrayType(ir.IntType(8), buf_len)
                 buf = self.builder.alloca(buf_type, name=f"{stmt.name}_buf")
-                buf_ptr = self.builder.gep(buf, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+                buf_ptr = self.builder.gep(
+                    buf,
+                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)],
+                )
 
                 stdin_ptr = self.module.get_global("stdin")
                 stdin_val = self.builder.load(stdin_ptr)
 
-                self.builder.call(self.fgets, [
-                    buf_ptr,
-                    ir.Constant(ir.IntType(32), buf_len),
-                    stdin_val
-                ])
+                self.builder.call(
+                    self.fgets,
+                    [buf_ptr, ir.Constant(ir.IntType(32), buf_len), stdin_val],
+                )
                 self.builder.store(buf_ptr, ptr)
 
             # BOOL: map 0 to "negative", 1 to "positive"
             elif isinstance(var_type, ir.IntType) and var_type.width == 1:
                 str_buf_type = ir.ArrayType(ir.IntType(8), 8)
                 str_buf = self.builder.alloca(str_buf_type, name=f"{stmt.name}_buf")
-                str_ptr = self.builder.gep(str_buf, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+                str_ptr = self.builder.gep(
+                    str_buf,
+                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)],
+                )
 
                 # Step 2: Read into buffer using %s
                 fmt_ptr = self._scanf_format(LLVM[Type.STRING])
@@ -136,13 +144,18 @@ class CodeGenerator:
                 true_ptr = self._string_constant("positive", name="bool_true_cmp")
                 # false_ptr = self._string_constant("negative", name="bool_false_cmp")
 
-                strcmp_ty = ir.FunctionType(ir.IntType(32), [ir.IntType(8).as_pointer(), ir.IntType(8).as_pointer()])
+                strcmp_ty = ir.FunctionType(
+                    ir.IntType(32),
+                    [ir.IntType(8).as_pointer(), ir.IntType(8).as_pointer()],
+                )
                 strcmp = self.module.globals.get("strcmp")
                 if not strcmp:
                     strcmp = ir.Function(self.module, strcmp_ty, name="strcmp")
 
                 result = self.builder.call(strcmp, [str_ptr, true_ptr])
-                is_true = self.builder.icmp_signed("==", result, ir.Constant(ir.IntType(32), 0))
+                is_true = self.builder.icmp_signed(
+                    "==", result, ir.Constant(ir.IntType(32), 0)
+                )
 
                 bool_val = self.builder.zext(is_true, ir.IntType(1))
                 self.builder.store(bool_val, ptr)
@@ -163,7 +176,9 @@ class CodeGenerator:
                 false_str = self._string_constant("negative", "bool_false")
                 false_cast = self.builder.bitcast(false_str, ir.IntType(8).as_pointer())
 
-                is_true = self.builder.icmp_unsigned("==", val, ir.Constant(ir.IntType(1), 1))
+                is_true = self.builder.icmp_unsigned(
+                    "==", val, ir.Constant(ir.IntType(1), 1)
+                )
                 bool_str = self.builder.select(is_true, true_cast, false_cast)
                 fmt_ptr = self._printf_format(ir.IntType(1))
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
@@ -171,7 +186,7 @@ class CodeGenerator:
             else:
                 # llvm can't print floats for some reason and need to be casted to double :(
                 if isinstance(val_type, ir.FloatType):
-                   val = self.builder.fpext(val, ir.DoubleType())
+                    val = self.builder.fpext(val, ir.DoubleType())
 
                 fmt_ptr = self._printf_format(val_type)
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
@@ -219,7 +234,11 @@ class CodeGenerator:
         elif isinstance(type_, ir.FloatType):
             fmt_str = "%f\0"
             name = "scan_double"
-        elif isinstance(type_, ir.PointerType) and isinstance(type_.pointee, ir.IntType) and type_.pointee.width == 8:
+        elif (
+            isinstance(type_, ir.PointerType)
+            and isinstance(type_.pointee, ir.IntType)
+            and type_.pointee.width == 8
+        ):
             fmt_str = "%s\0"
             name = "scan_str"
         else:
@@ -248,7 +267,9 @@ class CodeGenerator:
         var.global_constant = True
         var.initializer = ir.Constant(str_type, bytearray(s.encode("utf8")))
 
-        ptr = self.builder.gep(var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+        ptr = self.builder.gep(
+            var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)]
+        )
         return ptr
 
     def gen_expr(self, expr):
@@ -262,7 +283,7 @@ class CodeGenerator:
 
         elif isinstance(expr, ast.UnaryOp):
             val = self.gen_expr(expr.operand)
-            if expr.op == 'NOT':
+            if expr.op == "NOT":
                 if isinstance(val.type, ir.IntType) and val.type.width == 1:
                     return self.builder.xor(val, ir.Constant(ir.IntType(1), 1))
             raise NotImplementedError(f"Unary operator {expr.op}")
@@ -274,60 +295,70 @@ class CodeGenerator:
             # Change types if nessesery
             if left.type != right.type:
                 # int -> float/double
-                if isinstance(left.type, ir.IntType) and isinstance(right.type, (ir.FloatType, ir.DoubleType)):
+                if isinstance(left.type, ir.IntType) and isinstance(
+                    right.type, (ir.FloatType, ir.DoubleType)
+                ):
                     left = self.builder.sitofp(left, right.type)
-                elif isinstance(right.type, ir.IntType) and isinstance(left.type, (ir.FloatType, ir.DoubleType)):
+                elif isinstance(right.type, ir.IntType) and isinstance(
+                    left.type, (ir.FloatType, ir.DoubleType)
+                ):
                     right = self.builder.sitofp(right, left.type)
                 # float -> double
-                elif isinstance(left.type, ir.FloatType) and isinstance(right.type, ir.DoubleType):
+                elif isinstance(left.type, ir.FloatType) and isinstance(
+                    right.type, ir.DoubleType
+                ):
                     left = self.builder.fpext(left, ir.DoubleType())
-                elif isinstance(right.type, ir.FloatType) and isinstance(left.type, ir.DoubleType):
+                elif isinstance(right.type, ir.FloatType) and isinstance(
+                    left.type, ir.DoubleType
+                ):
                     right = self.builder.fpext(right, ir.DoubleType())
                 # double -> float
-                #elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
+                # elif isinstance(left.type, ir.DoubleType) and isinstance(right.type, ir.FloatType):
                 #    left = self.builder.fptrunc(left, ir.FloatType())
-                #elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
+                # elif isinstance(right.type, ir.DoubleType) and isinstance(left.type, ir.FloatType):
                 #    right = self.builder.fptrunc(right, ir.FloatType())
 
             op = expr.op
 
-            if isinstance(left.type, ir.FloatType) or isinstance(left.type, ir.DoubleType):
-                if op == '+':
+            if isinstance(left.type, ir.FloatType) or isinstance(
+                left.type, ir.DoubleType
+            ):
+                if op == "+":
                     return self.builder.fadd(left, right)
-                elif op == '-':
+                elif op == "-":
                     return self.builder.fsub(left, right)
-                elif op == '*':
+                elif op == "*":
                     return self.builder.fmul(left, right)
-                elif op == '/':
+                elif op == "/":
                     return self.builder.fdiv(left, right)
             else:
-                if op == '+':
+                if op == "+":
                     return self.builder.add(left, right)
-                elif op == '-':
+                elif op == "-":
                     return self.builder.sub(left, right)
-                elif op == '*':
+                elif op == "*":
                     return self.builder.mul(left, right)
-                elif op == '/':
+                elif op == "/":
                     return self.builder.sdiv(left, right)
 
-            if op == '<':
-                return self.builder.icmp_signed('<', left, right)
-            elif op == '>':
-                return self.builder.icmp_signed('>', left, right)
-            elif op == '=<':
-                return self.builder.icmp_signed('<=', left, right)
-            elif op == '>=':
-                return self.builder.icmp_signed('>=', left, right)
-            elif op == '==':
-                return self.builder.icmp_signed('==', left, right)
-            elif op == '!=':
-                return self.builder.icmp_signed('!=', left, right)
+            if op == "<":
+                return self.builder.icmp_signed("<", left, right)
+            elif op == ">":
+                return self.builder.icmp_signed(">", left, right)
+            elif op == "=<":
+                return self.builder.icmp_signed("<=", left, right)
+            elif op == ">=":
+                return self.builder.icmp_signed(">=", left, right)
+            elif op == "==":
+                return self.builder.icmp_signed("==", left, right)
+            elif op == "!=":
+                return self.builder.icmp_signed("!=", left, right)
 
-            elif op == 'AND':
+            elif op == "AND":
                 return self.builder.and_(left, right)
-            elif op == 'OR':
+            elif op == "OR":
                 return self.builder.or_(left, right)
-            elif op == 'XOR':
+            elif op == "XOR":
                 return self.builder.xor(left, right)
 
             raise NotImplementedError(f"Operator '{op}' not handled.")
@@ -349,9 +380,13 @@ class CodeGenerator:
                 # Create a global constant string
                 strval = expr.value + "\0"
                 str_type = ir.ArrayType(ir.IntType(8), len(strval))
-                name = f"str_{abs(hash(expr.value)) % 100_000}" # names must be unique
+                name = f"str_{abs(hash(expr.value)) % 100_000}"  # names must be unique
                 var = ir.GlobalVariable(self.module, str_type, name=name)
                 var.global_constant = True
-                var.initializer = ir.Constant(str_type, bytearray(strval.encode("utf-8")))
-                return self.builder.gep(var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
-
+                var.initializer = ir.Constant(
+                    str_type, bytearray(strval.encode("utf-8"))
+                )
+                return self.builder.gep(
+                    var,
+                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)],
+                )

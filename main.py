@@ -1,11 +1,12 @@
-from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
-from output.AnsiipythoniumLexer import AnsiipythoniumLexer
-from output.AnsiipythoniumParser import AnsiipythoniumParser
+import sys
+
+from antlr4 import CommonTokenStream, FileStream, ParseTreeWalker
+
+from errors import APErrorListener
 from listener import ASTListener
 from llvm import CodeGenerator
-from errors import APErrorListener
-
-import sys
+from output.AnsiipythoniumLexer import AnsiipythoniumLexer
+from output.AnsiipythoniumParser import AnsiipythoniumParser
 
 filename = sys.argv[1]
 
@@ -19,7 +20,7 @@ if __name__ == "__main__":
 
     tokens = CommonTokenStream(lexer)
     parser = AnsiipythoniumParser(tokens)
-    
+
     parser.removeErrorListeners()
     parser_err = APErrorListener()
     parser.addErrorListener(parser_err)
@@ -39,4 +40,3 @@ if __name__ == "__main__":
 
     with open("temp.ll", "w") as f:
         f.write(str(codegen.module))
-

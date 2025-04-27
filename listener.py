@@ -1,7 +1,8 @@
+import ap_ast as ast
 from output.AnsiipythoniumListener import AnsiipythoniumListener
 from output.AnsiipythoniumParser import AnsiipythoniumParser
 from type import Type
-import ap_ast as ast
+
 
 class ASTListener(AnsiipythoniumListener):
 
@@ -132,4 +133,3 @@ class ASTListener(AnsiipythoniumListener):
 
     def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
         pass
-
