@@ -37,15 +37,13 @@ field: type ID ';';
 print: '<=' expr;
 read:  '=>' ID;
 
-type: type_identifier matrix_identifier?;
+type: type_identifier;
 type_identifier: INTEGER
     |            FLOAT32
     |            FLOAT64
     |            BOOLEAN
     |            ID
     |            STRING_KEYWORD;
-matrix_identifier: vector_identifier vector_identifier?;
-vector_identifier: '[' INT ']';
 INTEGER : 'integer';
 FLOAT32 : 'single_precision';
 FLOAT64 : 'double_precision';
