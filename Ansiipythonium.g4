@@ -11,7 +11,7 @@ addexpr	    : multexpr (('+'|'-') multexpr)*;
 multexpr    : minusexpr (('*'|'/') minusexpr)*;
 minusexpr   : ('+'|'-')* primaryexpr;
 primaryexpr :  funcallexpr | '(' expr ')' | literal;
-funcallexpr : ID '(' (',' expr)* ')';
+funcallexpr : ID '(' expr* (',' expr)* ')';
 
 literal: INT | DOUBLE | TRUE | FALSE | ID | STRING;
 statement:  expr ';'
@@ -21,12 +21,14 @@ statement:  expr ';'
     |       for_statement
     |       print ';'
     |       read ';'
+    |       return_statement ';'
     ;
 
 var_decl: type ID ASSIGNMENT expr;
 var_ass:  ID ASSIGNMENT expr;
 if_statement: 'if' '(' expr ')' stat_block (':' stat_block)?;
 for_statement: 'for' '(' (var_decl | var_ass) ';' expr ';' expr ')' stat_block;
+return_statement: 'return' expr;
 stat_block: '{' statement* '}';
 fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' stat_block;
 arg_decl: type ID;

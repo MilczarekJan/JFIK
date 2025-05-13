@@ -1,0 +1,9 @@
+integer add(integer a, integer b) {
+    <= a + b;
+}
+
+integer x <- 5;
+integer y <- 7;
+integer result <- add(x, y);
+<= "Sum of integers:";
+<= result;

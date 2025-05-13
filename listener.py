@@ -33,6 +33,11 @@ class ASTListener(AnsiipythoniumListener):
 
     def exitRead(self, ctx: AnsiipythoniumParser.ReadContext):
         self.stack.append(ast.Read(ctx.ID().getText()))
+        
+    # Add this method to handle return statements
+    def exitReturn_statement(self, ctx: AnsiipythoniumParser.Return_statementContext):
+        value = self.stack.pop()
+        self.stack.append(ast.ReturnStatement(value))
 
     def exitPrimaryexpr(self, ctx: AnsiipythoniumParser.PrimaryexprContext):
         if ctx.literal():
@@ -42,6 +47,18 @@ class ASTListener(AnsiipythoniumListener):
         elif ctx.expr():
             inner_expr = self.stack.pop()
             self.stack.append(inner_expr)
+
+    def exitFuncallexpr(self, ctx: AnsiipythoniumParser.FuncallexprContext):
+        # Get function name
+        func_name = ctx.ID().getText()
+        
+        # Get arguments
+        args = []
+        for i in range(len(ctx.expr())):
+            args.insert(0, self.stack.pop())  # Pop in reverse order
+            
+        # Create function call node
+        self.stack.append(ast.FunctionCall(func_name, args))
 
     def exitStatement(self, ctx: AnsiipythoniumParser.StatementContext):
         if ctx.expr():
@@ -93,6 +110,31 @@ class ASTListener(AnsiipythoniumListener):
         if ctx.NOT():
             operand = self.stack.pop()
             self.stack.append(ast.UnaryOp("NOT", operand))
+
+    def exitFun_decl(self, ctx: AnsiipythoniumParser.Fun_declContext):
+        # Get return type
+        return_type = ctx.type_().getText()
+        
+        # Get function name
+        func_name = ctx.ID().getText()
+        
+        # Get parameters
+        parameters = []
+        for arg_ctx in ctx.arg_decl():
+            param_type = arg_ctx.type_().getText()
+            param_name = arg_ctx.ID().getText()
+            parameters.append(ast.Parameter(param_type, param_name))
+        
+        # Get function body
+        stat_block = ctx.stat_block()
+        body = []
+        # We need to pop statements in reverse order
+        for _ in range(len(stat_block.statement())):
+            if self.stack:  # Check if stack is not empty
+                body.insert(0, self.stack.pop())
+        
+        # Create function declaration node
+        self.stack.append(ast.FunctionDeclaration(return_type, func_name, parameters, body))
 
     def _build_binary_expr(self, ctx, rule_name, node_cls=ast.BinaryOp):
         children = getattr(ctx, rule_name)()

@@ -52,3 +52,30 @@ class Literal(Node):
     def __init__(self, value, type_):
         self.value = value
         self.type_ = type_
+
+
+# New ReturnStatement AST node
+class ReturnStatement(Node):
+    def __init__(self, value):
+        self.value = value
+
+
+# AST nodes for function support
+class FunctionDeclaration(Node):
+    def __init__(self, return_type, name, parameters, body):
+        self.return_type = return_type
+        self.name = name
+        self.parameters = parameters  # List of Parameter objects
+        self.body = body  # List of statements
+
+
+class Parameter(Node):
+    def __init__(self, type_, name):
+        self.type_ = type_
+        self.name = name
+
+
+class FunctionCall(Node):
+    def __init__(self, name, arguments):
+        self.name = name
+        self.arguments = arguments  # List of expressions
