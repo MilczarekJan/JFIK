@@ -23,6 +23,7 @@ class CodeGenerator:
         self.functions = {}  # Store function definitions
         self.current_function = None  # Track the function currently being processed
         self.function_scope_variables = {}  # Variables scoped to each function
+        self.struct_types = {}  # Store struct type definitions
 
         binding.initialize()
         binding.initialize_native_target()
@@ -63,9 +64,11 @@ class CodeGenerator:
             # stdin.initializer = ir.Constant(i8ptr, None)  # null pointer to satisfy llvmlite
 
     def generate(self, tree):
-        # First pass: Declare all functions
+        # First pass: Declare all structs and functions
         for stmt in tree.statements:
-            if isinstance(stmt, ast.FunctionDeclaration):
+            if isinstance(stmt, ast.StructDeclaration):
+                self.declare_struct(stmt)
+            elif isinstance(stmt, ast.FunctionDeclaration):
                 self.declare_function(stmt)
                 
         # Create main function
@@ -106,9 +109,41 @@ class CodeGenerator:
             "double_precision": Type.FLOAT64,
             "text": Type.STRING
         }
+        
+        # Check if it's a built-in type
         if type_str in type_map:
             return LLVM[type_map[type_str]]
+            
+        # Check if it's a user-defined struct
+        if type_str in self.struct_types:
+            return self.struct_types[type_str]['type']
+            
         raise ValueError(f"Unknown type: {type_str}")
+
+    def declare_struct(self, struct_decl):
+        """First pass: Create struct type definition"""
+        # Create a list to hold field types
+        field_types = []
+        field_names = []
+
+        # Add each field's type
+        for field in struct_decl.fields:
+            field_type = self.get_llvm_type(field.type_)
+            field_types.append(field_type)
+            field_names.append(field.name)
+
+        # Create an identified (named) struct type
+        struct_type = self.module.context.get_identified_type(struct_decl.name)
+        struct_type.set_body(*field_types)
+
+        # Store the struct type and field information for later use
+        self.struct_types[struct_decl.name] = {
+            'type': struct_type,
+            'fields': field_names
+        }
+
+        return struct_type
+
 
     def declare_function(self, func_decl):
         """First pass: Declare function signature"""
@@ -194,29 +229,100 @@ class CodeGenerator:
         assert isinstance(self.builder, ir.IRBuilder)
 
         if isinstance(stmt, ast.Declaration):
-            val = self.gen_expr(stmt.value)
-            llvm_type = LLVM[stmt.type_]
-
-            if val.type != llvm_type:
-                if llvm_type == ir.FloatType():
-                    # val = self.builder.fptrunc(val, ir.FloatType())
-                    val = self.builder.sitofp(val, ir.FloatType())
-                elif llvm_type == ir.DoubleType():
-                    val = self.builder.sitofp(val, ir.DoubleType())
-                elif llvm_type == ir.IntType(32):
-                    val = self.builder.fptosi(val, ir.IntType(32))
-
-            # print(llvm_type, val)
+            # Regular variable declaration
+            llvm_type = self.get_llvm_type(stmt.type_)
             ptr = self.builder.alloca(llvm_type, name=stmt.name)
-            self.builder.store(val, ptr)
             self.variables[stmt.name] = ptr
 
+            if stmt.value is not None:
+                val = self.gen_expr(stmt.value)
+                self.builder.store(val, ptr)
+            '''
+            else:
+                # Original declaration handling
+                val = self.gen_expr(stmt.value)
+                llvm_type = self.get_llvm_type(stmt.type_)
+                
+                # Type conversion logic...
+                
+                ptr = self.builder.alloca(llvm_type, name=stmt.name)
+                self.builder.store(val, ptr)
+                self.variables[stmt.name] = ptr
+            '''
+            '''
+            elif isinstance(stmt, ast.StructDeclaration):
+                struct_type_info = self.struct_types.get(stmt.name)
+                if struct_type_info is None:
+                    raise RuntimeError(f"Struct type '{stmt.name}' not defined")
+
+                llvm_struct_type = struct_type_info["type"]
+                ptr = self.builder.alloca(llvm_struct_type, name=stmt.var_name)
+                self.variables[stmt.var_name] = ptr
+            '''
+        elif isinstance(stmt, ast.StructVarDeclaration):
+            struct_info = self.struct_types.get(stmt.struct_type_name)
+            if struct_info is None:
+                raise RuntimeError(f"Struct type '{stmt.struct_type_name}' not defined")
+
+            llvm_struct_type = struct_info["type"]
+            ptr = self.builder.alloca(llvm_struct_type, name=stmt.var_name)
+            self.variables[stmt.var_name] = ptr
+
+            # Initialize fields to zero (optional, safe default)
+            for i, field_type in enumerate(llvm_struct_type.elements):
+                field_ptr = self.builder.gep(
+                    ptr,
+                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), i)],
+                    name=f"{stmt.var_name}_field{i}"
+                )
+                if isinstance(field_type, ir.IntType):
+                    self.builder.store(ir.Constant(field_type, 0), field_ptr)
+                elif isinstance(field_type, (ir.FloatType, ir.DoubleType)):
+                    self.builder.store(ir.Constant(field_type, 0.0), field_ptr)
+                else:
+                    raise NotImplementedError(f"Cannot initialize field of type {field_type}")
+
         elif isinstance(stmt, ast.Assignment):
-            val = self.gen_expr(stmt.value)
-            ptr = self.variables.get(stmt.name)
-            if not ptr:
-                raise RuntimeError(f"Variable '{stmt.name}' not declared")
-            self.builder.store(val, ptr)
+            # Struct field assignment
+            if isinstance(stmt.name, ast.StructAccess):
+                struct_var_name = stmt.name.struct_var.name
+                field_name = stmt.name.field_name
+
+                struct_ptr = self.variables.get(struct_var_name)
+                if struct_ptr is None:
+                    raise RuntimeError(f"Undefined struct variable: {struct_var_name}")
+
+                struct_type = struct_ptr.type.pointee
+                if not isinstance(struct_type, ir.types.LiteralStructType) and not isinstance(struct_type, ir.types.IdentifiedStructType):
+                    raise RuntimeError(f"Variable '{struct_var_name}' is not a struct")
+
+                struct_name = struct_type.name
+                struct_info = self.struct_types.get(struct_name)
+                if struct_info is None:
+                    raise RuntimeError(f"Struct type info for '{struct_name}' not found")
+
+                if field_name not in struct_info["fields"]:
+                    raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+
+                field_idx = struct_info["fields"].index(field_name)
+
+                field_ptr = self.builder.gep(
+                    struct_ptr,
+                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), field_idx)],
+                    name=f"{struct_var_name}.{field_name}"
+                )
+
+                val = self.gen_expr(stmt.value)
+                self.builder.store(val, field_ptr)
+
+            else:
+                # Regular assignment
+                ptr = self.variables.get(stmt.name)
+                if ptr is None:
+                    raise RuntimeError(f"Variable '{stmt.name}' not declared before assignment")
+
+                val = self.gen_expr(stmt.value)
+                self.builder.store(val, ptr)
 
         elif isinstance(stmt, ast.Read):
             ptr = self.variables.get(stmt.name)
@@ -559,3 +665,43 @@ class CodeGenerator:
                     var,
                     [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)],
                 )
+            
+        elif isinstance(expr, ast.StructAccess):
+            # First, get the variable that holds the struct
+            struct_var_name = expr.struct_var.name
+            ptr = self.variables.get(struct_var_name)
+            
+            if ptr is None:
+                raise RuntimeError(f"Undefined struct variable: {struct_var_name}")
+            
+            # Get the struct type
+            struct_type = ptr.type.pointee
+            if not isinstance(struct_type, ir.StructType):
+                raise RuntimeError(f"Variable {struct_var_name} is not a struct")
+            
+            # Get the struct definition
+            struct_name = struct_type.name
+            struct_info = None
+            for name, info in self.struct_types.items():
+                if info['type'] == struct_type:
+                    struct_info = info
+                    break
+                    
+            if struct_info is None:
+                raise RuntimeError(f"Unknown struct type: {struct_name}")
+            
+            # Find the field index
+            field_name = expr.field_name
+            if field_name not in struct_info['fields']:
+                raise RuntimeError(f"Struct {struct_name} has no field {field_name}")
+            
+            field_idx = struct_info['fields'].index(field_name)
+            
+            # Generate GEP instruction to get address of the field
+            field_ptr = self.builder.gep(ptr, 
+                                    [ir.Constant(ir.IntType(32), 0), 
+                                        ir.Constant(ir.IntType(32), field_idx)],
+                                    name=f"{struct_var_name}.{field_name}")
+            
+            # Load and return the field value
+            return self.builder.load(field_ptr)

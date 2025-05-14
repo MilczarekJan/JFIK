@@ -79,3 +79,34 @@ class FunctionCall(Node):
     def __init__(self, name, arguments):
         self.name = name
         self.arguments = arguments  # List of expressions
+
+
+class StructDeclaration(Node):
+    def __init__(self, name, fields):
+        self.name = name
+        self.fields = fields  # List of Field objects
+
+
+class StructVarDeclaration(Node):
+    def __init__(self, struct_type_name, var_name):
+        self.struct_type_name = struct_type_name
+        self.var_name = var_name
+
+
+class Field(Node):
+    def __init__(self, type_, name):
+        self.type_ = type_
+        self.name = name
+
+
+class StructAccess(Node):
+    def __init__(self, struct_var, field_name):
+        self.struct_var = struct_var  # Variable representing a struct
+        self.field_name = field_name  # Name of the field to access
+
+
+class StructAssign(Node):
+    def __init__(self, struct_var, field_name, value):
+        self.struct_var = struct_var  # Variable representing a struct
+        self.field_name = field_name  # Name of the field to assign to
+        self.value = value  # Value to assign to the field
