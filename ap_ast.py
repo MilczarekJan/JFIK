@@ -105,8 +105,8 @@ class StructAccess(Node):
         self.field_name = field_name  # Name of the field to access
 
 
-class StructAssign(Node):
+class StructFieldAssignment:
     def __init__(self, struct_var, field_name, value):
-        self.struct_var = struct_var  # Variable representing a struct
-        self.field_name = field_name  # Name of the field to assign to
-        self.value = value  # Value to assign to the field
+        self.struct_var = struct_var  # This is a Variable reference
+        self.field_name = field_name
+        self.value = value

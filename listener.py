@@ -22,8 +22,8 @@ class ASTListener(AnsiipythoniumListener):
     def exitVar_decl(self, ctx: AnsiipythoniumParser.Var_declContext):
         type_ = ctx.type_().getText()
         name = ctx.ID().getText()
-        print("Declaring variable of type:", type_)  # DEBUG
-        print("Known structs:", self.struct_types)   # DEBUG
+        #print("Declaring variable of type:", type_)  # DEBUG
+        #print("Known structs:", self.struct_types)   # DEBUG
 
         value = None
         if ctx.expr():  # Check if initializer is present
@@ -189,22 +189,48 @@ class ASTListener(AnsiipythoniumListener):
         # Get structure name
         struct_name = ctx.ID().getText()
         self.struct_types.add(struct_name)  # <== Track it
-        print("Struct declared:", struct_name)  # DEBUG
         # Get fields
         fields = []
         for field_ctx in ctx.field():
             field_type = field_ctx.type_().getText()
             field_name = field_ctx.ID().getText()
             fields.append(ast.Field(field_type, field_name))
-        
+            #print("Field declared:", field_type)  # DEBUG
         # Create structure declaration node
         self.stack.append(ast.StructDeclaration(struct_name, fields))
     
     def exitStruct_access(self, ctx: AnsiipythoniumParser.Struct_accessContext):
-        # Get struct variable name and field name
-        struct_var_name = ctx.ID(0).getText()
+        # Get the variable ID and field name
+        var_name = ctx.ID(0).getText()
         field_name = ctx.ID(1).getText()
         
-        # Create struct access node
-        struct_var = ast.Variable(struct_var_name)
+        # Create a variable reference node for the struct
+        struct_var = ast.Variable(var_name)
+        
+        # Create the struct access node
         self.stack.append(ast.StructAccess(struct_var, field_name))
+
+    def exitStruct_field_ass(self, ctx: AnsiipythoniumParser.Struct_field_assContext):
+        # Get the value to assign (should be on top of the stack)
+        value = self.stack.pop()
+        
+        # Get the struct_access node (will have object and field information)
+        struct_access = self.stack.pop()
+        
+        # Create a StructFieldAssignment AST node and push it onto the stack
+        self.stack.append(ast.StructFieldAssignment(struct_access.struct_var, 
+                                                struct_access.field_name, 
+                                                value))
+
+    def exitStructVar_decl(self, ctx: AnsiipythoniumParser.Struct_field_assContext):
+        # Extract the struct type name (e.g., "Person") and the variable name (e.g., "janek")
+        struct_type_name = ctx.struct_access().ID(0).getText()  # Type name
+        var_name = ctx.struct_access().ID(1).getText()          # Variable name
+        var_value = self.stack.pop()
+
+        # Create a StructVarDeclaration AST node and push it on the stack
+        self.stack.append(ast.StructVarDeclaration(struct_type_name, var_name, var_value))
+
+
+    
+    
