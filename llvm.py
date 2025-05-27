@@ -71,22 +71,22 @@ class CodeGenerator:
                 self.declare_struct(stmt)
             elif isinstance(stmt, ast.FunctionDeclaration):
                 self.declare_function(stmt)
-                
+
         # Create main function
         main_ty = ir.FunctionType(ir.IntType(32), [])
         self.func = ir.Function(self.module, main_ty, name="main")
         self.functions["main"] = self.func
-        
+
         block = self.func.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block)
         self.declare_printf()
         self.declare_scanf()
         self.declare_fgets()
         self.declare_stdin()
-        
+
         # Save main function's builder
         main_builder = self.builder
-        
+
         # Second pass: Process all statements
         for stmt in tree.statements:
             if isinstance(stmt, ast.FunctionDeclaration):
@@ -108,17 +108,17 @@ class CodeGenerator:
             "boolean": Type.BOOL,
             "single_precision": Type.FLOAT32,
             "double_precision": Type.FLOAT64,
-            "text": Type.STRING
+            "text": Type.STRING,
         }
-        
+
         # Check if it's a built-in type
         if type_str in type_map:
             return LLVM[type_map[type_str]]
-            
+
         # Check if it's a user-defined struct
         if type_str in self.struct_types:
-            return self.struct_types[type_str]['type']
-            
+            return self.struct_types[type_str]["type"]
+
         raise ValueError(f"Unknown type: {type_str}")
 
     def declare_struct(self, struct_decl):
@@ -139,56 +139,55 @@ class CodeGenerator:
 
         # Store the struct type and field information for later use
         self.struct_types[struct_decl.name] = {
-            'type': struct_type,
-            'fields': field_names
+            "type": struct_type,
+            "fields": field_names,
         }
 
         return struct_type
-
 
     def declare_function(self, func_decl):
         """First pass: Declare function signature"""
         # Get return type
         return_type = self.get_llvm_type(func_decl.return_type)
-        
+
         # Get parameter types
         param_types = []
         for param in func_decl.parameters:
             param_types.append(self.get_llvm_type(param.type_))
-        
+
         # Create function type
         func_type = ir.FunctionType(return_type, param_types)
-        
+
         # Create function
         func = ir.Function(self.module, func_type, name=func_decl.name)
-        
+
         # Store function for later reference
         self.functions[func_decl.name] = func
-        
+
         # Name parameters
         for i, param in enumerate(func_decl.parameters):
             func.args[i].name = param.name
-        
+
         return func
 
     def gen_function_body(self, func_decl):
         """Second pass: Generate function body"""
         # Get the already declared function
         func = self.functions[func_decl.name]
-        
+
         # Create function entry block
         block = func.append_basic_block(name="entry")
-        
+
         # Save current state
         old_builder = self.builder
         old_function = self.current_function
         old_variables = self.variables.copy()
-        
+
         # Set new state
         self.builder = ir.IRBuilder(block)
         self.current_function = func
         self.variables = {}  # Clear variables for new function scope
-        
+
         # Allocate and store function parameters
         for i, param in enumerate(func_decl.parameters):
             # Allocate space for parameter
@@ -197,14 +196,14 @@ class CodeGenerator:
             self.builder.store(func.args[i], ptr)
             # Add to variables dictionary
             self.variables[param.name] = ptr
-        
+
         # Generate code for function body
         for stmt in func_decl.body:
             self.gen_stmt(stmt)
             # Check if the last statement was a return - if so, no need to add default return
             if isinstance(stmt, ast.ReturnStatement):
                 break
-        
+
         # Add default return if the function block is not terminated (no return statement was found)
         if not self.builder.block.is_terminated:
             # Default return based on function return type
@@ -220,7 +219,7 @@ class CodeGenerator:
             elif return_type == ir.IntType(8).as_pointer():
                 null_str = self._string_constant("", "null_str_return")
                 self.builder.ret(null_str)
-        
+
         # Restore state
         self.builder = old_builder
         self.current_function = old_function
@@ -229,7 +228,7 @@ class CodeGenerator:
     def gen_stmt(self, stmt):
         assert isinstance(self.builder, ir.IRBuilder)
         # Set debug flag if not present
-        if not hasattr(self, 'debug'):
+        if not hasattr(self, "debug"):
             self.debug = False  # Set to True to enable debug messages
 
         if isinstance(stmt, ast.Declaration):
@@ -249,20 +248,20 @@ class CodeGenerator:
                 raise RuntimeError(f"Struct type '{stmt.struct_type_name}' not defined")
 
             llvm_struct_type = struct_info["type"]
-            
+
             # Allocate memory for the struct
             ptr = self.builder.alloca(llvm_struct_type, name=stmt.var_name)
             self.variables[stmt.var_name] = ptr
-            
+
             # Initialize struct fields to default values
             for i, field_name in enumerate(struct_info["fields"]):
                 field_type = llvm_struct_type.elements[i]
                 field_ptr = self.builder.gep(
                     ptr,
                     [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), i)],
-                    name=f"{stmt.var_name}_{field_name}_ptr"
+                    name=f"{stmt.var_name}_{field_name}_ptr",
                 )
-                
+
                 # Initialize with zeros based on field type
                 if isinstance(field_type, ir.IntType):
                     self.builder.store(ir.Constant(field_type, 0), field_ptr)
@@ -272,8 +271,12 @@ class CodeGenerator:
 
         elif isinstance(stmt, ast.StructFieldAssignment):
             # Get the struct variable
-            struct_var_name = stmt.struct_var.name  # ✅ Get the name of the struct variable
-            struct_ptr = self.variables.get(struct_var_name)  # ✅ Then use it to get the LLVM pointer
+            struct_var_name = (
+                stmt.struct_var.name
+            )  # ✅ Get the name of the struct variable
+            struct_ptr = self.variables.get(
+                struct_var_name
+            )  # ✅ Then use it to get the LLVM pointer
             if struct_ptr is None:
                 raise RuntimeError(f"Undefined struct variable: {struct_var_name}")
 
@@ -289,7 +292,9 @@ class CodeGenerator:
 
             field_name = stmt.field_name
             if field_name not in struct_info["fields"]:
-                raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+                raise RuntimeError(
+                    f"Struct '{struct_name}' has no field '{field_name}'"
+                )
 
             field_idx = struct_info["fields"].index(field_name)
             field_type = struct_type.elements[field_idx]
@@ -297,22 +302,26 @@ class CodeGenerator:
             # Generate code to evaluate the value expression
             value = self.gen_expr(stmt.value)
 
-            
             # Ensure value type matches field type
             if value.type != field_type:
                 # You might need type conversion here depending on your language semantics
-                raise RuntimeError(f"Type mismatch: cannot assign {value.type} to field of type {field_type}")
+                raise RuntimeError(
+                    f"Type mismatch: cannot assign {value.type} to field of type {field_type}"
+                )
 
             # Get pointer to the field
             field_ptr = self.builder.gep(
                 struct_ptr,
-                [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), field_idx)],
-                name=f"{struct_var_name}_{field_name}_ptr"
+                [
+                    ir.Constant(ir.IntType(32), 0),
+                    ir.Constant(ir.IntType(32), field_idx),
+                ],
+                name=f"{struct_var_name}_{field_name}_ptr",
             )
-            
+
             if self.debug:
                 print(f"Storing value to {struct_var_name}.{field_name}")
-            
+
             # Store the value to the field
             self.builder.store(value, field_ptr)
 
@@ -334,10 +343,14 @@ class CodeGenerator:
                 struct_name = struct_type.name
                 struct_info = self.struct_types.get(struct_name)
                 if struct_info is None:
-                    raise RuntimeError(f"Struct type info for '{struct_name}' not found")
+                    raise RuntimeError(
+                        f"Struct type info for '{struct_name}' not found"
+                    )
 
                 if field_name not in struct_info["fields"]:
-                    raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+                    raise RuntimeError(
+                        f"Struct '{struct_name}' has no field '{field_name}'"
+                    )
 
                 field_idx = struct_info["fields"].index(field_name)
                 val = self.gen_expr(stmt.value)
@@ -345,25 +358,31 @@ class CodeGenerator:
                 # Get a pointer to the specific field and store value there
                 field_ptr = self.builder.gep(
                     struct_ptr,
-                    [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), field_idx)],
-                    name=f"{struct_var_name}_{field_name}_ptr"
+                    [
+                        ir.Constant(ir.IntType(32), 0),
+                        ir.Constant(ir.IntType(32), field_idx),
+                    ],
+                    name=f"{struct_var_name}_{field_name}_ptr",
                 )
-                
+
                 # Debug: Print the value being stored
                 if self.debug:
-                    print(f"Storing value {val} to field {struct_var_name}.{field_name}")
-                
+                    print(
+                        f"Storing value {val} to field {struct_var_name}.{field_name}"
+                    )
+
                 self.builder.store(val, field_ptr)
 
             else:
                 # Regular assignment
                 ptr = self.variables.get(stmt.name)
                 if ptr is None:
-                    raise RuntimeError(f"Variable '{stmt.name}' not declared before assignment")
+                    raise RuntimeError(
+                        f"Variable '{stmt.name}' not declared before assignment"
+                    )
 
                 val = self.gen_expr(stmt.value)
                 self.builder.store(val, ptr)
-
 
         elif isinstance(stmt, ast.Read):
             ptr = self.variables.get(stmt.name)
@@ -454,30 +473,38 @@ class CodeGenerator:
                 fmt_ptr = self._printf_format(val_type)
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, val])
-                
+
         elif isinstance(stmt, ast.FunctionCall):
             # Generate code for function call but discard result
             self.gen_expr(stmt)
-            
+
         # Add this handler for return statements
         elif isinstance(stmt, ast.ReturnStatement):
             # Generate code for the return expression
             return_val = self.gen_expr(stmt.value)
-            
+
             # Get the function's return type
             func_return_type = self.current_function.return_value.type
-            
+
             # Cast the return value to the function's return type if needed
             if return_val.type != func_return_type:
-                if isinstance(func_return_type, ir.FloatType) and isinstance(return_val.type, ir.IntType):
+                if isinstance(func_return_type, ir.FloatType) and isinstance(
+                    return_val.type, ir.IntType
+                ):
                     return_val = self.builder.sitofp(return_val, ir.FloatType())
-                elif isinstance(func_return_type, ir.DoubleType) and isinstance(return_val.type, ir.IntType):
+                elif isinstance(func_return_type, ir.DoubleType) and isinstance(
+                    return_val.type, ir.IntType
+                ):
                     return_val = self.builder.sitofp(return_val, ir.DoubleType())
-                elif isinstance(func_return_type, ir.DoubleType) and isinstance(return_val.type, ir.FloatType):
+                elif isinstance(func_return_type, ir.DoubleType) and isinstance(
+                    return_val.type, ir.FloatType
+                ):
                     return_val = self.builder.fpext(return_val, ir.DoubleType())
-                elif isinstance(func_return_type, ir.IntType) and isinstance(return_val.type, ir.FloatType):
+                elif isinstance(func_return_type, ir.IntType) and isinstance(
+                    return_val.type, ir.FloatType
+                ):
                     return_val = self.builder.fptosi(return_val, ir.IntType(32))
-                    
+
             # Generate the return instruction
             self.builder.ret(return_val)
 
@@ -736,25 +763,31 @@ class CodeGenerator:
             func = self.functions.get(expr.name)
             if func is None:
                 raise RuntimeError(f"Undefined function: {expr.name}")
-            
+
             # Generate code for arguments
             args = []
             for arg_expr in expr.arguments:
                 arg_val = self.gen_expr(arg_expr)
                 args.append(arg_val)
-            
+
             # Check and adjust argument types if needed
             for i, (arg, param_type) in enumerate(zip(args, func.args)):
                 if arg.type != param_type.type:
                     # Handle type conversions
-                    if isinstance(param_type.type, ir.FloatType) and isinstance(arg.type, ir.IntType):
+                    if isinstance(param_type.type, ir.FloatType) and isinstance(
+                        arg.type, ir.IntType
+                    ):
                         args[i] = self.builder.sitofp(arg, ir.FloatType())
-                    elif isinstance(param_type.type, ir.DoubleType) and isinstance(arg.type, ir.IntType):
+                    elif isinstance(param_type.type, ir.DoubleType) and isinstance(
+                        arg.type, ir.IntType
+                    ):
                         args[i] = self.builder.sitofp(arg, ir.DoubleType())
-                    elif isinstance(param_type.type, ir.DoubleType) and isinstance(arg.type, ir.FloatType):
+                    elif isinstance(param_type.type, ir.DoubleType) and isinstance(
+                        arg.type, ir.FloatType
+                    ):
                         args[i] = self.builder.fpext(arg, ir.DoubleType())
                     # Add more conversions as needed
-            
+
             # Call the function
             return self.builder.call(func, args)
 
@@ -785,7 +818,7 @@ class CodeGenerator:
                     var,
                     [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)],
                 )
-            
+
         elif isinstance(expr, ast.StructAccess):
             struct_var_name = expr.struct_var.name
             struct_ptr = self.variables.get(struct_var_name)
@@ -804,19 +837,26 @@ class CodeGenerator:
 
             field_name = expr.field_name
             if field_name not in struct_info["fields"]:
-                raise RuntimeError(f"Struct '{struct_name}' has no field '{field_name}'")
+                raise RuntimeError(
+                    f"Struct '{struct_name}' has no field '{field_name}'"
+                )
 
             field_idx = struct_info["fields"].index(field_name)
 
             # Get pointer to field
             field_ptr = self.builder.gep(
                 struct_ptr,
-                [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), field_idx)],
-                name=f"{struct_var_name}_{field_name}_ptr"
+                [
+                    ir.Constant(ir.IntType(32), 0),
+                    ir.Constant(ir.IntType(32), field_idx),
+                ],
+                name=f"{struct_var_name}_{field_name}_ptr",
             )
-            
+
             if self.debug:
                 print(f"Loading field value from {struct_var_name}.{field_name}")
-                
+
             # Load and return field value
-            return self.builder.load(field_ptr, name=f"{struct_var_name}_{field_name}_val")
+            return self.builder.load(
+                field_ptr, name=f"{struct_var_name}_{field_name}_val"
+            )
