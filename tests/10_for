@@ -1,0 +1,5 @@
+<= "print nums from 2 to 11";
+
+for ( integer i <- 2; i =< 11; i <- i+1 ) {
+    <= i;
+}

@@ -29,8 +29,8 @@ statement:  expr ';'
 var_decl: (type ID ASSIGNMENT expr) | (type ID);
 var_ass:  ID ASSIGNMENT expr;
 if_statement: 'if' '(' expr ')' stat_block (':' stat_block)?;
-for_statement: 'for' '(' (var_decl | var_ass) ';' expr ';' expr ')' stat_block;
 return_statement: 'return' expr;
+for_statement: 'for' '(' (var_decl | var_ass) ';' expr ';' var_ass ')' stat_block;
 stat_block: '{' statement* '}';
 fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' stat_block;
 arg_decl: type ID;

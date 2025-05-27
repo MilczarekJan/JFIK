@@ -22,19 +22,10 @@ class ASTListener(AnsiipythoniumListener):
     def exitVar_decl(self, ctx: AnsiipythoniumParser.Var_declContext):
         type_ = ctx.type_().getText()
         name = ctx.ID().getText()
-        #print("Declaring variable of type:", type_)  # DEBUG
-        #print("Known structs:", self.struct_types)   # DEBUG
-
-        value = None
-        if ctx.expr():  # Check if initializer is present
-            value = self.stack.pop()
-            if type_ == "single_precision":
-                value.type_ = Type.FLOAT32
-
-        if type_ in self.struct_types:
-            self.stack.append(ast.StructVarDeclaration(type_, name))
-        else:
-            self.stack.append(ast.Declaration(type_, name, value))
+        value = self.stack.pop()
+        if type_ == "single_precision":
+            value.type_ = Type.FLOAT32
+        self.stack.append(ast.Declaration(type_, name, value))
 
     def exitPrint(self, ctx: AnsiipythoniumParser.PrintContext):
         value = self.stack.pop()
@@ -42,7 +33,7 @@ class ASTListener(AnsiipythoniumListener):
 
     def exitRead(self, ctx: AnsiipythoniumParser.ReadContext):
         self.stack.append(ast.Read(ctx.ID().getText()))
-        
+
     # Add this method to handle return statements
     def exitReturn_statement(self, ctx: AnsiipythoniumParser.Return_statementContext):
         value = self.stack.pop()
@@ -60,12 +51,12 @@ class ASTListener(AnsiipythoniumListener):
     def exitFuncallexpr(self, ctx: AnsiipythoniumParser.FuncallexprContext):
         # Get function name
         func_name = ctx.ID().getText()
-        
+
         # Get arguments
         args = []
         for i in range(len(ctx.expr())):
             args.insert(0, self.stack.pop())  # Pop in reverse order
-            
+
         # Create function call node
         self.stack.append(ast.FunctionCall(func_name, args))
 
@@ -123,17 +114,17 @@ class ASTListener(AnsiipythoniumListener):
     def exitFun_decl(self, ctx: AnsiipythoniumParser.Fun_declContext):
         # Get return type
         return_type = ctx.type_().getText()
-        
+
         # Get function name
         func_name = ctx.ID().getText()
-        
+
         # Get parameters
         parameters = []
         for arg_ctx in ctx.arg_decl():
             param_type = arg_ctx.type_().getText()
             param_name = arg_ctx.ID().getText()
             parameters.append(ast.Parameter(param_type, param_name))
-        
+
         # Get function body
         stat_block = ctx.stat_block()
         body = []
@@ -141,9 +132,11 @@ class ASTListener(AnsiipythoniumListener):
         for _ in range(len(stat_block.statement())):
             if self.stack:  # Check if stack is not empty
                 body.insert(0, self.stack.pop())
-        
+
         # Create function declaration node
-        self.stack.append(ast.FunctionDeclaration(return_type, func_name, parameters, body))
+        self.stack.append(
+            ast.FunctionDeclaration(return_type, func_name, parameters, body)
+        )
 
     def _build_binary_expr(self, ctx, rule_name, node_cls=ast.BinaryOp):
         children = getattr(ctx, rule_name)()
@@ -176,11 +169,16 @@ class ASTListener(AnsiipythoniumListener):
             self.stack.append(ast.Literal(val, Type.STRING))
 
         elif ctx.ID():
-            # It's not a literal, it's a variable
             self.stack.append(ast.Variable(ctx.ID().getText()))
 
-    def exitType(self, ctx: AnsiipythoniumParser.TypeContext):
-        pass
+    def exitFor_statement(self, ctx: AnsiipythoniumParser.For_statementContext):
+        body_stmts = self.stack.pop()
+        iter_expr = self.stack.pop()
+        cond_expr = self.stack.pop()
+        init_stmt = self.stack.pop()
+
+        loop = ast.ForLoop(init_stmt, cond_expr, iter_expr, body_stmts)
+        self.stack.append(loop)
 
     def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
         pass
@@ -195,42 +193,59 @@ class ASTListener(AnsiipythoniumListener):
             field_type = field_ctx.type_().getText()
             field_name = field_ctx.ID().getText()
             fields.append(ast.Field(field_type, field_name))
-            #print("Field declared:", field_type)  # DEBUG
+            # print("Field declared:", field_type)  # DEBUG
         # Create structure declaration node
         self.stack.append(ast.StructDeclaration(struct_name, fields))
-    
+
     def exitStruct_access(self, ctx: AnsiipythoniumParser.Struct_accessContext):
         # Get the variable ID and field name
         var_name = ctx.ID(0).getText()
         field_name = ctx.ID(1).getText()
-        
+
         # Create a variable reference node for the struct
         struct_var = ast.Variable(var_name)
-        
+
         # Create the struct access node
         self.stack.append(ast.StructAccess(struct_var, field_name))
 
     def exitStruct_field_ass(self, ctx: AnsiipythoniumParser.Struct_field_assContext):
         # Get the value to assign (should be on top of the stack)
         value = self.stack.pop()
-        
+
         # Get the struct_access node (will have object and field information)
         struct_access = self.stack.pop()
-        
+
         # Create a StructFieldAssignment AST node and push it onto the stack
-        self.stack.append(ast.StructFieldAssignment(struct_access.struct_var, 
-                                                struct_access.field_name, 
-                                                value))
+        self.stack.append(
+            ast.StructFieldAssignment(
+                struct_access.struct_var, struct_access.field_name, value
+            )
+        )
 
     def exitStructVar_decl(self, ctx: AnsiipythoniumParser.Struct_field_assContext):
         # Extract the struct type name (e.g., "Person") and the variable name (e.g., "janek")
         struct_type_name = ctx.struct_access().ID(0).getText()  # Type name
-        var_name = ctx.struct_access().ID(1).getText()          # Variable name
+        var_name = ctx.struct_access().ID(1).getText()  # Variable name
         var_value = self.stack.pop()
 
         # Create a StructVarDeclaration AST node and push it on the stack
-        self.stack.append(ast.StructVarDeclaration(struct_type_name, var_name, var_value))
+        self.stack.append(
+            ast.StructVarDeclaration(struct_type_name, var_name, var_value)
+        )
 
+    def exitIf_statement(self, ctx: AnsiipythoniumParser.If_statementContext):
+        else_body = None
+        if len(ctx.stat_block()) == 2:
+            else_body = self.stack.pop()
+        if_body = self.stack.pop()
+        cond = self.stack.pop()
 
-    
-    
+        node = ast.If(cond, if_body, else_body)
+        self.stack.append(node)
+
+    def exitStat_block(self, ctx: AnsiipythoniumParser.Stat_blockContext):
+        body = []
+        for _ in ctx.statement():
+            body.append(self.stack.pop())
+        body.reverse()
+        self.stack.append(body)

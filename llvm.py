@@ -24,6 +24,7 @@ class CodeGenerator:
         self.current_function = None  # Track the function currently being processed
         self.function_scope_variables = {}  # Variables scoped to each function
         self.struct_types = {}  # Store struct type definitions
+        self.if_count = 0
 
         binding.initialize()
         binding.initialize_native_target()
@@ -479,6 +480,85 @@ class CodeGenerator:
                     
             # Generate the return instruction
             self.builder.ret(return_val)
+
+        elif isinstance(stmt, ast.ForLoop):
+            # Initializer
+            self.gen_stmt(stmt.var)
+
+            # Create blocks
+            assert isinstance(self.func, ir.Function)
+            loop_cond_block = self.func.append_basic_block("loop_cond")
+            loop_body_block = self.func.append_basic_block("loop_body")
+            loop_iter_block = self.func.append_basic_block("loop_iter")
+            loop_exit_block = self.func.append_basic_block("loop_exit")
+
+            # Branch to condition first
+            self.builder.branch(loop_cond_block)
+
+            # Condition block
+            self.builder.position_at_start(loop_cond_block)
+            cond_val = self.gen_expr(stmt.cond)
+
+            # Ensure cond_val is boolean (i1)
+            if not (isinstance(cond_val.type, ir.IntType) and cond_val.type.width == 1):
+                # Convert to boolean if necessary, e.g., compare != 0
+                if isinstance(cond_val.type, ir.IntType):
+                    zero = ir.Constant(cond_val.type, 0)
+                    cond_val = self.builder.icmp_signed("!=", cond_val, zero)
+                elif isinstance(cond_val.type, (ir.FloatType, ir.DoubleType)):
+                    zero = ir.Constant(cond_val.type, 0.0)
+                    cond_val = self.builder.fcmp_ordered("!=", cond_val, zero)
+                else:
+                    raise RuntimeError("Unsupported condition type in for loop")
+
+            self.builder.cbranch(cond_val, loop_body_block, loop_exit_block)
+
+            # Loop body block
+            self.builder.position_at_start(loop_body_block)
+            for body_stmt in stmt.body:
+                self.gen_stmt(body_stmt)
+            self.builder.branch(loop_iter_block)
+
+            # Loop iteration block
+            self.builder.position_at_start(loop_iter_block)
+            self.gen_stmt(stmt.iter)
+            self.builder.branch(loop_cond_block)
+
+            # Loop exit block
+            self.builder.position_at_start(loop_exit_block)
+
+        elif isinstance(stmt, ast.If):
+            if_id = self.if_count
+            self.if_count += 1
+
+            cond_val = self.gen_expr(stmt.cond)
+
+            # Create basic blocks for if-true, else (optional), and merge
+            if_true_block = self.builder.append_basic_block(f"if_true_{if_id}")
+            merge_block = self.builder.append_basic_block(f"if_merge_{if_id}")
+
+            # Branch on the condition
+            if stmt.else_body:
+                if_false_block = self.builder.append_basic_block(f"if_false_{if_id}")
+                self.builder.cbranch(cond_val, if_true_block, if_false_block)
+            else:
+                self.builder.cbranch(cond_val, if_true_block, merge_block)
+
+            # Compile the if body
+            self.builder.position_at_start(if_true_block)
+            for body_stmt in stmt.if_body:
+                self.gen_stmt(body_stmt)
+            self.builder.branch(merge_block)  # jump to merge block after if body
+
+            # Compile the else body if it exists
+            if stmt.else_body:
+                self.builder.position_at_start(if_false_block)
+                for body_stmt in stmt.else_body:
+                    self.gen_stmt(body_stmt)
+                self.builder.branch(merge_block)
+
+            # Position builder at the merge block to continue
+            self.builder.position_at_start(merge_block)
 
     def _printf_format(self, type_):
         if isinstance(type_, ir.IntType):
