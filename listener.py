@@ -135,6 +135,16 @@ class ASTListener(AnsiipythoniumListener):
         loop = ast.ForLoop(init_stmt, cond_expr, iter_expr, body_stmts)
         self.stack.append(loop)
 
+    def exitIf_statement(self, ctx: AnsiipythoniumParser.If_statementContext):
+        else_body = None
+        if len(ctx.stat_block()) == 2:
+            else_body = self.stack.pop()
+        if_body = self.stack.pop()
+        cond = self.stack.pop()
+
+        node = ast.If(cond, if_body, else_body)
+        self.stack.append(node)
+
     def exitStat_block(self, ctx: AnsiipythoniumParser.Stat_blockContext):
         body = []
         for _ in ctx.statement():

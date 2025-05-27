@@ -1,0 +1,15 @@
+<= "If statement test";
+
+if ( positive ) {
+    <= "this if will be printed";
+}
+
+if ( negative ) {
+    <= "this if will not be printed";
+}
+
+if ( negative ) {
+    <= "this if will not be printed again";
+} : {
+    <= "this else will be printed";
+}

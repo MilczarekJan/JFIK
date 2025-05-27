@@ -60,3 +60,10 @@ class ForLoop(Node):
         self.cond = cond
         self.iter = iter
         self.body = body
+
+
+class If(Node):
+    def __init__(self, cond, if_body, else_body):
+        self.cond = cond
+        self.if_body = if_body
+        self.else_body = else_body

@@ -20,6 +20,7 @@ class CodeGenerator:
         self.func = None
         self.variables = {}
         self.fmt_str = None
+        self.if_count = 0
 
         binding.initialize()
         binding.initialize_native_target()
@@ -237,6 +238,39 @@ class CodeGenerator:
 
             # Loop exit block
             self.builder.position_at_start(loop_exit_block)
+
+        elif isinstance(stmt, ast.If):
+            if_id = self.if_count
+            self.if_count += 1
+
+            cond_val = self.gen_expr(stmt.cond)
+
+            # Create basic blocks for if-true, else (optional), and merge
+            if_true_block = self.builder.append_basic_block(f"if_true_{if_id}")
+            merge_block = self.builder.append_basic_block(f"if_merge_{if_id}")
+
+            # Branch on the condition
+            if stmt.else_body:
+                if_false_block = self.builder.append_basic_block(f"if_false_{if_id}")
+                self.builder.cbranch(cond_val, if_true_block, if_false_block)
+            else:
+                self.builder.cbranch(cond_val, if_true_block, merge_block)
+
+            # Compile the if body
+            self.builder.position_at_start(if_true_block)
+            for body_stmt in stmt.if_body:
+                self.gen_stmt(body_stmt)
+            self.builder.branch(merge_block)  # jump to merge block after if body
+
+            # Compile the else body if it exists
+            if stmt.else_body:
+                self.builder.position_at_start(if_false_block)
+                for body_stmt in stmt.else_body:
+                    self.gen_stmt(body_stmt)
+                self.builder.branch(merge_block)
+
+            # Position builder at the merge block to continue
+            self.builder.position_at_start(merge_block)
 
     def _printf_format(self, type_):
         if isinstance(type_, ir.IntType):
