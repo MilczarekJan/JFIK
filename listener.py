@@ -23,7 +23,6 @@ class ASTListener(AnsiipythoniumListener):
         name = ctx.ID().getText()
         value = self.stack.pop()
         if type_ == "single_precision":
-            # print("s_p")
             value.type_ = Type.FLOAT32
         self.stack.append(ast.Declaration(type_, name, value))
 
@@ -125,11 +124,20 @@ class ASTListener(AnsiipythoniumListener):
             self.stack.append(ast.Literal(val, Type.STRING))
 
         elif ctx.ID():
-            # It's not a literal, it's a variable
             self.stack.append(ast.Variable(ctx.ID().getText()))
 
-    def exitType(self, ctx: AnsiipythoniumParser.TypeContext):
-        pass
+    def exitFor_statement(self, ctx: AnsiipythoniumParser.For_statementContext):
+        body_stmts = self.stack.pop()
+        iter_expr = self.stack.pop()
+        cond_expr = self.stack.pop()
+        init_stmt = self.stack.pop()
 
-    def exitType_identifier(self, ctx: AnsiipythoniumParser.Type_identifierContext):
-        pass
+        loop = ast.ForLoop(init_stmt, cond_expr, iter_expr, body_stmts)
+        self.stack.append(loop)
+
+    def exitStat_block(self, ctx: AnsiipythoniumParser.Stat_blockContext):
+        body = []
+        for _ in ctx.statement():
+            body.append(self.stack.pop())
+        body.reverse()
+        self.stack.append(body)

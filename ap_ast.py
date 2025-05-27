@@ -52,3 +52,11 @@ class Literal(Node):
     def __init__(self, value, type_):
         self.value = value
         self.type_ = type_
+
+
+class ForLoop(Node):
+    def __init__(self, var, cond, iter, body):
+        self.var = var
+        self.cond = cond
+        self.iter = iter
+        self.body = body

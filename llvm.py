@@ -192,6 +192,52 @@ class CodeGenerator:
                 fmt_cast = self.builder.bitcast(fmt_ptr, ir.IntType(8).as_pointer())
                 self.builder.call(self.printf, [fmt_cast, val])
 
+        elif isinstance(stmt, ast.ForLoop):
+            # Initializer
+            self.gen_stmt(stmt.var)
+
+            # Create blocks
+            assert isinstance(self.func, ir.Function)
+            loop_cond_block = self.func.append_basic_block("loop_cond")
+            loop_body_block = self.func.append_basic_block("loop_body")
+            loop_iter_block = self.func.append_basic_block("loop_iter")
+            loop_exit_block = self.func.append_basic_block("loop_exit")
+
+            # Branch to condition first
+            self.builder.branch(loop_cond_block)
+
+            # Condition block
+            self.builder.position_at_start(loop_cond_block)
+            cond_val = self.gen_expr(stmt.cond)
+
+            # Ensure cond_val is boolean (i1)
+            if not (isinstance(cond_val.type, ir.IntType) and cond_val.type.width == 1):
+                # Convert to boolean if necessary, e.g., compare != 0
+                if isinstance(cond_val.type, ir.IntType):
+                    zero = ir.Constant(cond_val.type, 0)
+                    cond_val = self.builder.icmp_signed("!=", cond_val, zero)
+                elif isinstance(cond_val.type, (ir.FloatType, ir.DoubleType)):
+                    zero = ir.Constant(cond_val.type, 0.0)
+                    cond_val = self.builder.fcmp_ordered("!=", cond_val, zero)
+                else:
+                    raise RuntimeError("Unsupported condition type in for loop")
+
+            self.builder.cbranch(cond_val, loop_body_block, loop_exit_block)
+
+            # Loop body block
+            self.builder.position_at_start(loop_body_block)
+            for body_stmt in stmt.body:
+                self.gen_stmt(body_stmt)
+            self.builder.branch(loop_iter_block)
+
+            # Loop iteration block
+            self.builder.position_at_start(loop_iter_block)
+            self.gen_stmt(stmt.iter)
+            self.builder.branch(loop_cond_block)
+
+            # Loop exit block
+            self.builder.position_at_start(loop_exit_block)
+
     def _printf_format(self, type_):
         if isinstance(type_, ir.IntType):
             if type_.width == 1:
