@@ -54,7 +54,6 @@ class Literal(Node):
         self.type_ = type_
 
 
-<<<<<<< HEAD
 # New ReturnStatement AST node
 class ReturnStatement(Node):
     def __init__(self, value):
@@ -111,7 +110,8 @@ class StructFieldAssignment:
         self.struct_var = struct_var  # This is a Variable reference
         self.field_name = field_name
         self.value = value
-=======
+
+
 class ForLoop(Node):
     def __init__(self, var, cond, iter, body):
         self.var = var
@@ -125,4 +125,3 @@ class If(Node):
         self.cond = cond
         self.if_body = if_body
         self.else_body = else_body
->>>>>>> etap-2
