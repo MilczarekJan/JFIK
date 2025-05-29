@@ -1,3 +1,4 @@
 *.jar
 __pycache__
 output/*
+program
