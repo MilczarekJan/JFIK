@@ -126,7 +126,7 @@ class ASTListener(AnsiipythoniumListener):
             parameters.append(ast.Parameter(param_type, param_name))
 
         # Get function body
-        stat_block = ctx.stat_block()
+        stat_block = ctx.func_block()
         body = []
         # We need to pop statements in reverse order
         for _ in range(len(stat_block.statement())):

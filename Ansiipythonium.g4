@@ -32,7 +32,8 @@ if_statement: 'if' '(' expr ')' stat_block (':' stat_block)?;
 return_statement: 'return' expr;
 for_statement: 'for' '(' (var_decl | var_ass) ';' expr ';' var_ass ')' stat_block;
 stat_block: '{' statement* '}';
-fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' stat_block;
+func_block: '{' statement* '}';
+fun_decl: type ID '(' arg_decl? (',' arg_decl)* ')' func_block;
 arg_decl: type ID;
 class_decl: 'class' ID '{' field* fun_decl* '}'; //Muszą być najpierw pola
 struct_decl: 'structure' ID '{' field* '}';
